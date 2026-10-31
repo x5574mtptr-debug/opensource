@@ -8,16 +8,18 @@
 ③ 手机上 Shizuku 显示「已启动」→ 去「设置」授权其他应用
 ```
 
+
+
 ---
 
 ## 手机端必做（一次配好长期有效）
 
-| 步骤 | 路径 |
-|---|---|
-| 开发者选项 | 设置 → 关于手机 → 连点「版本号」7 次 |
-| USB 调试 | 开发者选项 → 开启 |
-| USB 用途 | 开发者选项 → USB 配置 → 仅充电 |
-| 后台运行 | 电池优化 → Shizuku → 不优化 / 允许后台 |
+| 步骤     | 路径                          |
+| ------ | --------------------------- |
+| 开发者选项  | 设置 → 关于手机 → 连点「版本号」7 次      |
+| USB 调试 | 开发者选项 → 开启                  |
+| USB 用途 | 开发者选项 → USB 配置 → 仅充电        |
+| 后台运行   | 电池优化 → Shizuku → 不优化 / 允许后台 |
 
 **厂商额外项**
 
@@ -45,11 +47,11 @@ IP 地址        192.168.1.100     ← 填「设备 IP」
 
 ## 状态对照
 
-| 界面显示 | 含义 |
-|---|---|
-| 服务进程 ✓ | `shizuku_server` 进程在跑 |
+| 界面显示        | 含义                             |
+| ----------- | ------------------------------ |
+| 服务进程 ✓      | `shizuku_server` 进程在跑          |
 | Binder 注册 ✓ | `/proc/net/unix` 里有 shizuku 服务 |
-| 应用已安装 ✓ | `pm path` 能查到包名 |
+| 应用已安装 ✓     | `pm path` 能查到包名                |
 
 三个都 ✓ = 完全可用。
 
@@ -71,7 +73,11 @@ IP 地址        192.168.1.100     ← 填「设备 IP」
 # 看设备
 adb devices -l
 
-# 启动 Shizuku
+# ★ 推荐：app_process 直启（Android 11+ 唯一可靠方案）
+adb shell "pm path moe.shizuku.privileged.api"
+adb shell "/system/bin/app_process -Djava.class.path=/data/app/~~xxx==/moe.shizuku.privileged.api-yyy==/base.apk /system/bin --nice-name=shizuku_server rikka.shizuku.server.ShizukuService"
+
+# 老方案：start.sh（Android 10 及以下可用，Android 11+ 会被分区存储拒绝）
 adb -s <设备序列号> shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh
 
 # 查状态
@@ -84,8 +90,24 @@ adb connect 192.168.1.100:5555
 
 ---
 
-## 记住这三条
+## 记住这四条
 
 1. **手机重启后必须重新激活** —— 系统限制，无法绕过
-2. **MIUI 必须开「USB 调试（安全设置）」** —— 九成失败都是这个
-3. **adb 没有就点「下载内置 adb」** —— 不用自己装 SDK
+2. **「找不到 start.sh」是正常的** —— Android 11+ 分区存储限制 + Shizuku v13.7 已移除该脚本。工具会自动改用 app_process 直启
+3. **MIUI 必须开「USB 调试（安全设置）」** —— 九成失败都是这个
+4. **adb 没有就点「下载内置 adb」** —— 不用自己装 SDK
+
+---
+
+## 卡住了怎么办
+
+点工具里的 **「设备诊断」** 按钮，它会逐项告诉你：
+
+- Shizuku 应用装了没
+- Android 版本（是否触发分区存储限制）
+- Android/data 能不能读
+- start.sh 在不在
+- app_process 在不在
+- 服务跑没跑
+
+每项都会给出原因和下一步建议，比自己猜快得多。
