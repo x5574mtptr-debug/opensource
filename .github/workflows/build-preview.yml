@@ -22,16 +22,16 @@ jobs:
 
       - name: Validate manifests are valid JSON
         run: |
-          echo "校验所有 manifest.json 是否为合法 JSON…"
+          echo "校验所有 manifest.json 是否为合法 JSON（兼容含空格路径）…"
           fail=0
-          for f in $(find . -name manifest.json -not -path '*/node_modules/*'); do
-            if ! node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"; then
+          while IFS= read -r -d '' f; do
+            if ! node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$f"; then
               echo "❌ 非法 JSON: $f"
               fail=1
             else
               echo "✅ $f"
             fi
-          done
+          done < <(find . -name manifest.json -not -path '*/node_modules/*' -print0)
           exit $fail
 
       - name: Build each Vela project (best-effort)
