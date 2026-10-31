@@ -19,6 +19,10 @@ const S = readState();
 S.paired = S.paired || false;
 S.shizukuStarted = S.shizukuStarted || false;
 S.connected = S.connected || false;
+// 模拟开关：Android 11+ 分区存储限制（默认开启 = Android/data 不可读）
+if (S.androidDataReadable === undefined) S.androidDataReadable = false;
+if (S.startShExists === undefined) S.startShExists = false;
+if (S.androidVersion === undefined) S.androidVersion = '14';
 
 // 剥离 -s <serial> 前缀
 let argv = process.argv.slice(2);
@@ -89,6 +93,23 @@ switch (cmd) {
 
   case 'shell': {
     const joined = args.slice(1).join(' ');
+
+    // app_process 直启（新增方案）—— 必须先匹配具体的启动命令，
+    // 否则 "ls -l /system/bin/app_process" 这类探测命令会被误判
+    if (joined.includes('--nice-name=shizuku_server')) {
+      if (!S.shizukuStarted) {
+        S.shizukuStarted = true;
+        writeState(S);
+      }
+      out = '';
+      break;
+    }
+
+    if (joined.includes('ls -l /system/bin/app_process')) {
+      out = 'lrwxrwxrwx 1 root shell 12345 2026-01-01 00:00 /system/bin/app_process';
+      break;
+    }
+
     if (joined.includes('ps -A')) {
       out = S.shizukuStarted ? 'u0_a42    1234  999  1234  4321 shizuku_server' : '';
       break;
@@ -98,15 +119,59 @@ switch (cmd) {
       break;
     }
     if (joined.includes('pm path')) {
-      out = 'package:/data/app/~~abc==/moe.shizuku.privileged.api-xyz/base.apk';
+      if (S.packageMissing) {
+        out = 'Unknown package: moe.shizuku.privileged.api';
+        code = 1;
+      } else {
+        out = 'package:/data/app/~~abc123==/moe.shizuku.privileged.api-xyz==/base.apk';
+      }
       break;
     }
     if (joined.includes('getprop')) {
-      out = '14';
+      out = S.androidVersion || '14';
       break;
     }
     if (joined.includes('monkey')) {
       out = 'Events injected: 1';
+      break;
+    }
+    if (joined.includes('killall') || joined.includes('pkill')) {
+      out = '';
+      break;
+    }
+    if (joined.includes('ls ') && joined.includes('Android/data')) {
+      // 模拟 Android 11+ 分区存储限制
+      if (S.androidDataReadable) {
+        out = 'start.sh\nstarter';
+      } else {
+        out = 'ls: /storage/emulated/0/Android/data/moe.shizuku.privileged.api: Permission denied';
+      }
+      break;
+    }
+    if (joined.includes('test -f')) {
+      out = 'NO';
+      break;
+    }
+    if (joined.includes('cp ') && joined.includes('starter')) {
+      if (S.androidDataReadable) {
+        S.starterCopied = true;
+        writeState(S);
+        out = '';
+      } else {
+        out = 'cp: /storage/emulated/0/Android/data/moe.shizuku.privileged.api/starter: Permission denied';
+      }
+      break;
+    }
+    if (joined.includes('chmod')) {
+      out = '';
+      break;
+    }
+    if (joined.includes('/data/local/tmp/shizuku')) {
+      if (S.starterCopied) {
+        S.shizukuStarted = true;
+        writeState(S);
+      }
+      out = '';
       break;
     }
     if (joined.includes('start.sh')) {
