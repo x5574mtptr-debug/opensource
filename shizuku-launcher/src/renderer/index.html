@@ -203,7 +203,10 @@
               <h3>激活 Shizuku</h3>
               <span class="tag" id="activateTarget">未选择设备</span>
             </div>
-            <p class="card-text">将执行等价于以下命令（会自动尝试多个脚本路径以适配不同 ROM 与版本）：</p>
+            <p class="card-text">
+              工具会自动按顺序尝试多种启动方式，兼容 Android 10/11+ 与 Shizuku v13.6/v13.7+，
+              无需你手动挑选。首选方案完全绕开文件系统限制，成功率最高。
+            </p>
             <div class="code-block">
               <code id="cmdPreview">adb -s &lt;设备&gt; shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh</code>
               <button class="btn btn-sm btn-ghost" id="btnCopyCmd">复制</button>
@@ -213,17 +216,50 @@
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 立即激活
               </button>
+              <button class="btn" id="btnDiagnose">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                设备诊断
+              </button>
               <button class="btn" id="btnLaunchApp">打开手机上的 Shizuku</button>
             </div>
             <div class="result-box" id="activateResult" hidden></div>
+            <div class="diag-panel" id="diagPanel" hidden></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>启动方式说明</h3></div>
+            <div class="method-list">
+              <div class="method-item ok">
+                <span class="method-rank">1</span>
+                <div class="method-body">
+                  <b>app_process 直接拉起</b>
+                  <small>首选。用 <code>pm path</code> 定位 Shizuku APK，再以 app_process 直接运行服务进程，完全不碰 Android/data 目录 —— Android 11+ 的分区存储限制和 v13.7 移除 start.sh 的问题都绕开了。</small>
+                </div>
+              </div>
+              <div class="method-item">
+                <span class="method-rank">2</span>
+                <div class="method-body">
+                  <b>start.sh 直接执行</b>
+                  <small>兼容 Android 10 及以下与旧版 Shizuku。此路径在 Android 11+ 会被系统拒绝，属预期现象。</small>
+                </div>
+              </div>
+              <div class="method-item">
+                <span class="method-rank">3</span>
+                <div class="method-body">
+                  <b>starter 复制到 /data/local/tmp</b>
+                  <small>Shizuku v13.6 官方推荐方式。需能读取 Android/data，部分机型不可行。</small>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="card">
             <div class="card-head"><h3>常见问题速查</h3></div>
             <div class="faq" id="faq">
-              <details><summary>提示找不到 start.sh 脚本</summary><p>说明手机上的 Shizuku 应用没有完成过初始化。打开手机上的 Shizuku 应用，进入「无线调试」页完成一次配对或启动动作，再回来重试。</p></details>
-              <details><summary>提示权限被拒绝（Permission denied）</summary><p>MIUI：开发者选项中开启「USB 调试（安全设置）」。ColorOS：关闭「权限监控」。Flyme：关闭「Flyme 支付保护」。</p></details>
-              <details><summary>设备显示 unauthorized</summary><p>手机上弹出「允许 USB 调试」时勾选「一律允许」并确认。若无弹窗，撤销 USB 调试授权后重新插拔数据线。</p></details>
+              <details><summary>提示找不到 start.sh 脚本</summary><p>这在 Android 11+ 上是<b>正常现象</b> —— 分区存储限制让 adb 无法读取 Android/data，而 Shizuku v13.7 起更是彻底移除了该脚本。工具会自动改用 app_process 直启，无需你处理。</p></details>
+              <details><summary>提示 Permission denied</summary><p>同样是 Android 11+ 分区存储限制，不是权限没开。工具会自动切换方案。若 app_process 直启也失败，再检查 MIUI 的「USB 调试（安全设置）」与 ColorOS 的「权限监控」。</p></details>
+              <details><summary>提示未安装 Shizuku 应用</summary><p>手机上确实没装 Shizuku，或装的是修改版导致包名不对。从官方渠道安装后打开一次即可。</p></details>
+              <details><summary>设备显示 unauthorized</summary><p>手机上的授权弹窗没确认。撤销 USB 调试授权后重新插拔数据线，再勾选「一律允许」。</p></details>
               <details><summary>激活成功但一会儿又失效</summary><p>手机重启后 ADB 会话结束，Shizuku 服务随之停止，属正常现象，重新激活即可。</p></details>
             </div>
           </div>
