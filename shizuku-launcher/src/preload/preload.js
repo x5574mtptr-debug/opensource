@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Shizuku
   activate: (serial) => ipcRenderer.invoke('shizuku:activate', serial),
+  diagnose: (serial) => ipcRenderer.invoke('shizuku:diagnose', serial),
   getStatus: (serial) => ipcRenderer.invoke('shizuku:status', serial),
   launchApp: (serial) => ipcRenderer.invoke('shizuku:launchApp', serial),
   getAndroidVersion: (serial) => ipcRenderer.invoke('shizuku:androidVersion', serial),
