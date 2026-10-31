@@ -26,6 +26,7 @@ const { Logger } = require('./logger');
 const { Config } = require('./config');
 const { AdbManager } = require('./adb');
 const { ShizukuManager } = require('./shizuku');
+const { FastbootManager } = require('./fastboot');
 
 const isDev = process.argv.includes('--dev');
 const startHidden = process.argv.includes('--hidden');
@@ -61,6 +62,7 @@ let logger = null;
 let config = null;
 let adb = null;
 let shizuku = null;
+let fastboot = null;
 let statusTimer = null;
 
 function resourcesDir() {
@@ -297,6 +299,24 @@ function registerIpc() {
     return shizuku.listDevices();
   });
 
+  // ---- Fastboot 设备（假设备模式用于界面预览） ----
+  ipcMain.handle('fastboot:devices', async () => {
+    if (useFakeDevice) {
+      return {
+        ok: true,
+        version: '34.0.5',
+        path: 'C:\\platform-tools\\fastboot.exe',
+        devices: [
+          { serial: 'FAKEFB01', state: 'fastboot', stateText: '已连接', product: 'raven', variant: 'raven' }
+        ]
+      };
+    }
+    const loc = await fastboot.locate();
+    if (!loc.ok) return { ok: false, error: loc.error, devices: [] };
+    const devices = await fastboot.listDevices();
+    return { ok: true, devices, version: loc.version, path: loc.exe };
+  });
+
   // ---- 无线 ----
   ipcMain.handle('wireless:pair', (_e, { host, port, code }) =>
     shizuku.pair(host, port, code)
@@ -318,6 +338,25 @@ function registerIpc() {
   ipcMain.handle('shizuku:status', (_e, serial) => shizuku.checkStatus(serial));
   ipcMain.handle('shizuku:launchApp', (_e, serial) => shizuku.launchShizukuApp(serial));
   ipcMain.handle('shizuku:androidVersion', (_e, serial) => shizuku.getAndroidVersion(serial));
+
+  // ---- Fastboot ----
+  ipcMain.handle('fastboot:locate', async (_e, opts) => fastboot.locate(opts || {}));
+  ipcMain.handle('fastboot:info', (_e, serial) => fastboot.getDeviceInfo(serial));
+  ipcMain.handle('fastboot:perform', async (_e, { serial, action, extra }) =>
+    fastboot.perform(serial, action, extra || [])
+  );
+  ipcMain.handle('fastboot:risk', (_e, action) => fastboot.getRisk(action));
+
+  // ---- 文件选择（Fastboot 刷入镜像） ----
+  ipcMain.handle('dialog:pickFile', async (_e, filters) => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: '选择要刷入的文件',
+      properties: ['openFile'],
+      filters: filters || [{ name: '全部文件', extensions: ['*'] }]
+    });
+    if (res.canceled || !res.filePaths.length) return null;
+    return res.filePaths[0];
+  });
 
   // ---- 应用 ----
   ipcMain.handle('app:info', () => ({
@@ -402,6 +441,7 @@ app.whenReady().then(async () => {
 
   adb = new AdbManager({ logger, config, resourcesDir: res });
   shizuku = new ShizukuManager({ logger, config, adb });
+  fastboot = new FastbootManager({ logger, config, adb });
 
   logger.on('entry', (entry) => broadcast('log:entry', entry));
 
@@ -452,37 +492,58 @@ async function runUiTour(win, dir) {
   const steps = ['env', 'device', 'activate', 'verify'];
   try {
     fs.mkdirSync(dir, { recursive: true });
-    for (const step of steps) {
-      await win.webContents.executeJavaScript(
-        `document.querySelector('.step-item[data-step="${step}"]').click()`
+
+    // 点击辅助：找不到元素时返回 false 而不是抛错，避免整个巡检中断
+    const click = (selector) =>
+      win.webContents.executeJavaScript(
+        `(() => { const el = document.querySelector(${JSON.stringify(selector)});
+                  if (!el) return false; el.click(); return true; })()`
       );
-      await sleep(650);
+    const shot = async (name) => {
       const img = await win.webContents.capturePage();
-      fs.writeFileSync(path.join(dir, `ui-${step}.png`), img.toPNG());
-      logger.info('巡检截图', { step });
+      fs.writeFileSync(path.join(dir, `ui-${name}.png`), img.toPNG());
+      logger.info('巡检截图', { name });
+    };
+
+    // Shizuku 区的四个子步骤（分段控件）
+    for (const step of steps) {
+      const ok = await click(`.seg-item[data-step="${step}"]`);
+      if (!ok) {
+        logger.warn('巡检未找到分段控件', { step });
+        continue;
+      }
+      await sleep(700);
+      await shot(step);
     }
+
+    // Fastboot 专区
+    await click('.zone-item[data-zone="fastboot"]');
+    await sleep(900);
+    await shot('fastboot');
+
+    // 高风险操作二次确认弹窗
+    await click('.op-btn[data-fb="flashing unlock"]');
+    await sleep(600);
+    await shot('fastboot-confirm');
+    await click('.modal [data-act="cancel"]');
+    await sleep(300);
 
     // 深色主题
     await win.webContents.executeJavaScript(
       `document.documentElement.setAttribute('data-theme','dark');
-       document.querySelector('.step-item[data-step="verify"]').click();`
+       document.querySelector('.zone-item[data-zone="fastboot"]').click();`
     );
     await sleep(600);
-    fs.writeFileSync(
-      path.join(dir, 'ui-dark.png'),
-      (await win.webContents.capturePage()).toPNG()
-    );
+    await shot('dark');
 
     // 设置弹窗
     await win.webContents.executeJavaScript(
       `document.documentElement.setAttribute('data-theme','light');
+       document.querySelector('.zone-item[data-zone="shizuku"]').click();
        document.getElementById('btnOpenSettings').click();`
     );
     await sleep(700);
-    fs.writeFileSync(
-      path.join(dir, 'ui-settings.png'),
-      (await win.webContents.capturePage()).toPNG()
-    );
+    await shot('settings');
 
     logger.info('界面巡检完成', { dir });
   } catch (e) {
