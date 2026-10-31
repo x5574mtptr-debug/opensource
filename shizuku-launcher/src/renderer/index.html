@@ -22,38 +22,27 @@
         </div>
       </div>
 
-      <nav class="steps" id="stepNav">
-        <button class="step-item is-active" data-step="env">
-          <span class="step-idx">1</span>
-          <span class="step-body">
-            <span class="step-title">环境准备</span>
-            <span class="step-desc">检查 adb 与工具链</span>
+      <nav class="zones" id="zoneNav">
+        <button class="zone-item is-active" data-zone="shizuku">
+          <span class="zone-ico">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.35 6.19 20.4l1.11-6.47L2.6 9.35l6.5-.95L12 2.5z"/></svg>
           </span>
-          <span class="step-badge" id="badge-env"></span>
+          <span class="zone-body">
+            <span class="zone-title">Shizuku 激活</span>
+            <span class="zone-desc">检查环境 · 连接设备 · 启动服务 · 验证</span>
+          </span>
+          <span class="zone-badge" id="badge-shizuku"></span>
         </button>
-        <button class="step-item" data-step="device">
-          <span class="step-idx">2</span>
-          <span class="step-body">
-            <span class="step-title">设备连接</span>
-            <span class="step-desc">USB 或无线调试</span>
+
+        <button class="zone-item" data-zone="fastboot">
+          <span class="zone-ico">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
           </span>
-          <span class="step-badge" id="badge-device"></span>
-        </button>
-        <button class="step-item" data-step="activate">
-          <span class="step-idx">3</span>
-          <span class="step-body">
-            <span class="step-title">激活服务</span>
-            <span class="step-desc">一条命令启动</span>
+          <span class="zone-body">
+            <span class="zone-title">Fastboot 专区</span>
+            <span class="zone-desc">刷入镜像 · 解锁 · 清理 · 重启</span>
           </span>
-          <span class="step-badge" id="badge-activate"></span>
-        </button>
-        <button class="step-item" data-step="verify">
-          <span class="step-idx">4</span>
-          <span class="step-body">
-            <span class="step-title">状态确认</span>
-            <span class="step-desc">验证服务已运行</span>
-          </span>
-          <span class="step-badge" id="badge-verify"></span>
+          <span class="zone-badge" id="badge-fastboot"></span>
         </button>
       </nav>
 
@@ -89,8 +78,23 @@
       </header>
 
       <div class="content" id="content">
-        <!-- 步骤 1：环境 -->
-        <section class="view is-active" data-view="env">
+        <!-- ================= Shizuku 激活专区 ================= -->
+        <div class="zone-pane is-active" data-zone-pane="shizuku">
+        <div class="segmented" id="shizukuTabs">
+          <button class="seg-item is-active" data-step="env">
+            <span class="seg-num">1</span><span>环境准备</span>
+          </button>
+          <button class="seg-item" data-step="device">
+            <span class="seg-num">2</span><span>设备连接</span>
+          </button>
+          <button class="seg-item" data-step="activate">
+            <span class="seg-num">3</span><span>激活服务</span>
+          </button>
+          <button class="seg-item" data-step="verify">
+            <span class="seg-num">4</span><span>状态确认</span>
+          </button>
+        </div>
+<section class="view is-active" data-view="env">
           <div class="card">
             <div class="card-head">
               <h3>ADB 工具链</h3>
@@ -297,6 +301,103 @@
             </ol>
           </div>
         </section>
+        </div>
+
+        <!-- ================= Fastboot 专区 ================= -->
+        <div class="zone-pane" data-zone-pane="fastboot">
+        <section class="view" data-view="fastboot">
+          <div class="card">
+            <div class="card-head">
+              <h3>Fastboot 设备</h3>
+              <div class="head-tools">
+                <span class="tag" id="fbCount">0 台</span>
+                <button class="btn btn-sm" id="btnRefreshFb">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                  刷新
+                </button>
+              </div>
+            </div>
+            <p class="card-text">
+              Fastboot 是 Android 的底层刷机模式。请让手机进入 fastboot 后再刷新
+              （关机状态下按住「音量下 + 电源」开机，或在已连接 adb 时执行 <code>adb reboot bootloader</code>）。
+            </p>
+            <div class="device-list" id="fbDeviceList">
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
+                <p>暂无 fastboot 设备</p>
+                <small>让手机进入 fastboot 模式后点击刷新</small>
+              </div>
+            </div>
+            <div class="fb-info" id="fbInfo" hidden></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>常用操作</h3><span class="subtle" id="fbTarget">未选择设备</span></div>
+            <div class="op-group">
+              <div class="op-group-title">重启</div>
+              <div class="op-row">
+                <button class="op-btn" data-fb="reboot">重启系统</button>
+                <button class="op-btn" data-fb="reboot bootloader">重启到 Bootloader</button>
+                <button class="op-btn" data-fb="reboot recovery">重启到 Recovery</button>
+              </div>
+            </div>
+
+            <div class="op-group">
+              <div class="op-group-title">刷入镜像</div>
+              <div class="op-row">
+                <label class="file-field">
+                  <span>镜像文件</span>
+                  <input type="text" id="fbFilePath" placeholder="选择 .img / .zip 文件" readonly />
+                  <button class="btn btn-sm" id="btnPickFile">浏览…</button>
+                </label>
+              </div>
+              <div class="op-row">
+                <button class="op-btn" data-fb="flash boot" data-needs-file="1">刷入 boot</button>
+                <button class="op-btn" data-fb="flash recovery" data-needs-file="1">刷入 recovery</button>
+                <button class="op-btn" data-fb="flash vbmeta" data-needs-file="1">刷入 vbmeta</button>
+                <button class="op-btn" data-fb="flash zip" data-needs-file="1">刷入 ZIP 包</button>
+                <button class="op-btn" data-fb="boot" data-needs-file="1">临时启动镜像</button>
+              </div>
+            </div>
+
+            <div class="op-group">
+              <div class="op-group-title">Bootloader</div>
+              <div class="op-row">
+                <button class="op-btn" data-fb="flashing unlock">解锁 Bootloader</button>
+                <button class="op-btn" data-fb="flashing lock">锁定 Bootloader</button>
+              </div>
+            </div>
+
+            <div class="op-group danger-group">
+              <div class="op-group-title">清理数据（高风险）</div>
+              <div class="op-row">
+                <button class="op-btn danger" data-fb="erase cache">清除缓存</button>
+                <button class="op-btn danger" data-fb="erase userdata">清除用户数据</button>
+                <button class="op-btn danger" data-fb="-w">格式化并恢复出厂</button>
+              </div>
+            </div>
+
+            <div class="result-box" id="fbResult" hidden></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>命令输出</h3><span class="subtle">fastboot 的原始返回</span></div>
+            <div class="fb-console" id="fbConsole"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Fastboot 注意事项</h3></div>
+            <ol class="guide-list">
+              <li>刷入前<b>务必确认镜像与机型、版本完全匹配</b>，刷错可能导致无法开机。</li>
+              <li>解锁 Bootloader 会<b>清除全部数据</b>，且可能使银行/支付类应用无法使用。</li>
+              <li>部分机型需要先解锁才能刷入第三方镜像，解锁前会要求清除数据。</li>
+              <li>操作期间不要拔数据线，异常断线可能导致设备变砖。</li>
+              <li>如果只想授权应用用系统 API，<b>不需要 fastboot</b>，用 Shizuku 激活专区即可。</li>
+            </ol>
+          </div>
+        </section>
+        </div>
+
       </div>
 
       <!-- ============ 日志面板 ============ -->
@@ -344,10 +445,14 @@
       </div>
       <div class="modal-body">
         <div class="set-group">
-          <h4>ADB</h4>
+          <h4>ADB 与 Fastboot</h4>
           <label class="field">
             <span>adb 可执行文件路径</span>
             <input type="text" id="setAdbPath" placeholder="留空则自动探测，例如 D:\\platform-tools\\adb.exe" />
+          </label>
+          <label class="field">
+            <span>fastboot 可执行文件路径</span>
+            <input type="text" id="setFastbootPath" placeholder="留空则自动探测（通常与 adb 同目录）" />
           </label>
           <label class="field">
             <span>platform-tools 下载源</span>
