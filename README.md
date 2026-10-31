@@ -23,6 +23,7 @@
 | `explore.js` / `list_files.js` / `list_pages.js` / `list_src.js` | 用于分析 Vela 包结构的探索脚本 | — |
 | [`test/`](test/) | 测试项目的构建产物与资源 | — |
 | [`shizuku-launcher/`](shizuku-launcher/) | Windows 桌面端 Shizuku 激活工具（Electron），免 root 管理应用权限 | [BUILD.md](shizuku-launcher/BUILD.md) |
+| [`shizuku-launcher/`](shizuku-launcher/) | Windows 桌面端 Shizuku 激活工具（Electron），免 root 管理应用权限 | [BUILD.md](shizuku-launcher/BUILD.md) |
 
 ## 构建与运行
 
@@ -46,6 +47,7 @@ npm run release    # 构建签名发布包（.rpk）
 - `67 语音助手/` —— 基于 Vela 的**离线 AI 对话助手**（手表端），内置关键词问答库 `src/common/qa.js`，无需联网即可对话。
 - `explore.js` / `list_files.js` / `list_pages.js` / `list_src.js` —— 用于分析 Vela 包结构的探索脚本。
 - `test/build/` —— 测试项目的构建产物与资源。
+- `shizuku-launcher/` —— Windows 桌面端 Shizuku 激活工具（基于 Electron），把 ADB 激活流程压缩成几步点击，免 root 管理应用权限；含主进程（adb 调用、激活、日志、配置）、渲染界面与测试桩。
 - `shizuku-launcher/` —— Windows 桌面端 Shizuku 激活工具（基于 Electron），把 ADB 激活流程压缩成几步点击，免 root 管理应用权限；含主进程（adb 调用、激活、日志、配置）、渲染界面与测试桩。
 
 ## 开源说明
