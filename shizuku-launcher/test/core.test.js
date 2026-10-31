@@ -12,6 +12,7 @@ const { Logger } = require('../src/main/logger');
 const { Config } = require('../src/main/config');
 const { AdbManager } = require('../src/main/adb');
 const { ShizukuManager } = require('../src/main/shizuku');
+const { FastbootManager } = require('../src/main/fastboot');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shizuku-test-'));
 const fakeAdb = path.join(__dirname, 'fake-adb.bat');
@@ -46,6 +47,7 @@ async function main() {
   // 重置假设备状态
   const stateFile = path.join(__dirname, 'fake-adb-state.json');
   try { fs.unlinkSync(stateFile); } catch (_) {}
+  try { fs.unlinkSync(path.join(__dirname, 'fake-fastboot-state.json')); } catch (_) {}
 
   const logger = new Logger(tmp);
   logger.setLevel('DEBUG');
@@ -306,6 +308,133 @@ async function main() {
     assert.strictEqual(r.ok, true);
     assert.ok(fs.statSync(target).size > 0);
   });
+
+  console.log('\n[11] Fastboot');
+  // 假 fastboot 用 .bat：cmd.exe 不允许用 .exe 扩展名执行批处理。
+  // 真实 platform-tools 里是 fastboot.exe，本测试覆盖的是"脚本包装器"这条候选路径。
+  const fakeFb = path.join(__dirname, 'fastboot.bat');
+  const fbStateFile = path.join(__dirname, 'fake-fastboot-state.json');
+
+  function fbReset() {
+    try { fs.unlinkSync(fbStateFile); } catch (_) {}
+  }
+  function fbState() {
+    try { return JSON.parse(fs.readFileSync(fbStateFile, 'utf8')); } catch (_) { return {}; }
+  }
+
+  const fbConfig = new Config(tmp);
+  fbConfig.set('adbPath', fakeAdb); // 让 fastboot 复用 adb 同目录的探测结果
+  const fbAdb = new AdbManager({ logger, config: fbConfig, resourcesDir });
+  const fb = new FastbootManager({ logger, config: fbConfig, adb: fbAdb });
+
+  await test('能定位到与 adb 同目录的 fastboot', async () => {
+    // 把 fastboot.bat 放到 fake-adb 同目录，模拟"脚本包装器"这条候选路径
+    const sameDir = path.dirname(fakeAdb);
+    const target = path.join(sameDir, 'fastboot.bat');
+    if (!fs.existsSync(target)) fs.copyFileSync(fakeFb, target);
+    const r = await fb.locate({ force: true });
+    assert.strictEqual(r.ok, true, r.error);
+    assert.ok(r.exe);
+  });
+
+  await test('设置中手动指定的 fastboot 路径优先', async () => {
+    const c2 = new Config(path.join(tmp, 'fbfix'));
+    c2.set('fastbootPath', fakeFb);
+    const a2 = new AdbManager({ logger, config: c2, resourcesDir });
+    const f2 = new FastbootManager({ logger, config: c2, adb: a2 });
+    const r = await f2.locate({ force: true });
+    assert.strictEqual(r.ok, true, r.error);
+    assert.strictEqual(r.source, '手动指定');
+  });
+
+  await test('列出 fastboot 设备', async () => {
+    fbReset();
+    const devs = await fb.listDevices();
+    assert.strictEqual(devs.length, 1);
+    assert.strictEqual(devs[0].serial, 'FAKEFB01');
+    assert.strictEqual(devs[0].state, 'fastboot');
+    assert.strictEqual(devs[0].product, 'raven');
+  });
+
+  await test('无设备时返回空列表', async () => {
+    const s = fbState();
+    s.devicePresent = false;
+    fs.writeFileSync(fbStateFile, JSON.stringify(s), 'utf8');
+    const devs = await fb.listDevices();
+    assert.strictEqual(devs.length, 0);
+  });
+
+  await test('读取设备信息 getvar all', async () => {
+    const s = fbState();
+    s.devicePresent = true;
+    fs.writeFileSync(fbStateFile, JSON.stringify(s), 'utf8');
+    const r = await fb.getDeviceInfo('FAKEFB01');
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.info.product, 'raven');
+    assert.strictEqual(r.info.unlocked, 'no');
+  });
+
+  await test('Bootloader 锁定时刷入会失败', async () => {
+    const s = fbState();
+    s.unlocked = false;
+    s.devicePresent = true;
+    fs.writeFileSync(fbStateFile, JSON.stringify(s), 'utf8');
+    const r = await fb.perform('FAKEFB01', 'flash boot', ['boot.img']);
+    assert.strictEqual(r.ok, false);
+    assert.ok(/locked|锁定/i.test(r.message), r.message);
+  });
+
+  await test('解锁 Bootloader 成功', async () => {
+    const r = await fb.perform('FAKEFB01', 'flashing unlock');
+    assert.strictEqual(r.ok, true, r.message);
+    const s = fbState();
+    assert.strictEqual(s.unlocked, true);
+  });
+
+  await test('解锁后刷入 boot 成功', async () => {
+    const r = await fb.perform('FAKEFB01', 'flash boot', ['boot.img']);
+    assert.strictEqual(r.ok, true, r.message);
+    assert.ok(/OKAY/.test(r.output));
+  });
+
+  await test('无效镜像被拒绝', async () => {
+    const r = await fb.perform('FAKEFB01', 'flash boot', ['bad-image.img']);
+    assert.strictEqual(r.ok, false);
+    assert.ok(/无效|不匹配|Invalid/i.test(r.message), r.message);
+  });
+
+  await test('清除用户数据成功', async () => {
+    const r = await fb.perform('FAKEFB01', 'erase userdata');
+    assert.strictEqual(r.ok, true, r.message);
+  });
+
+  await test('重启命令成功', async () => {
+    const r = await fb.perform('FAKEFB01', 'reboot');
+    assert.strictEqual(r.ok, true, r.message);
+  });
+
+  await test('高风险操作能被识别', () => {
+    const unlock = fb.getRisk('flashing unlock');
+    assert.ok(unlock);
+    assert.strictEqual(unlock.level, 'danger');
+    assert.ok(/数据/.test(unlock.note));
+    const erase = fb.getRisk('erase userdata');
+    assert.strictEqual(erase.level, 'danger');
+    const reboot = fb.getRisk('reboot');
+    assert.strictEqual(reboot, null, '重启不应算高风险');
+  });
+
+  await test('fastboot 未找到时给出明确提示', async () => {
+    const c2 = new Config(path.join(tmp, 'nofb'));
+    c2.set('adbPath', path.join(tmp, 'nonexistent-adb.exe'));
+    const a2 = new AdbManager({ logger, config: c2, resourcesDir });
+    const f2 = new FastbootManager({ logger, config: c2, adb: a2 });
+    const r = await f2.locate({ force: true });
+    assert.strictEqual(r.ok, false);
+    assert.ok(/platform-tools|fastboot/i.test(r.error), r.error);
+  });
+
+  fbReset();
 
   logger.close();
 
