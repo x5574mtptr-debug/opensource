@@ -11,6 +11,7 @@ const path = require('path');
 const DEFAULTS = {
   // adb
   adbPath: '',              // 手动指定 adb.exe 绝对路径（留空=自动探测）
+  fastbootPath: '',         // 手动指定 fastboot.exe 绝对路径（留空=自动探测）
   autoDetectAdb: true,      // 自动探测 adb
   adbServerPort: 5037,      // adb 服务端口
   // platform-tools
