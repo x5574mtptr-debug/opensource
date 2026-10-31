@@ -37,6 +37,11 @@ class AdbManager {
     return this.isWindows ? ADB_EXEC : ADB_UNIX;
   }
 
+  /** fastboot 通常与 adb 位于同一目录，给 FastbootManager 复用 */
+  get bundledFastboot() {
+    return path.join(this.bundledDir, this.isWindows ? 'fastboot.exe' : 'fastboot');
+  }
+
   /** 候选路径列表（按优先级） */
   _candidates() {
     const out = [];
