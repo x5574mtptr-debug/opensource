@@ -40,6 +40,15 @@ npm install
 npm start
 ```
 
+### 便捷启动器
+
+项目根目录有 `启动 Shizuku.bat`，双击即可直接启动已打包好的版本
+（跳过便携版每次的自解压，启动更快）。
+
+> 注意：`.bat` 文件必须保持纯 ASCII。cmd.exe 按系统 ANSI 码页（中文 Windows 是 GBK）
+> 读取批处理，文件里若有中文，乱码会吞掉后续行导致整条命令失效。
+> 改这个文件请用 `node scripts/make-launcher.js` 重新生成。
+
 ### 打包
 
 ```bash
@@ -83,15 +92,35 @@ npm run build
 
 ### 3. 激活服务
 
-选好设备后点「立即激活」。工具会依次尝试这些脚本路径，第一个成功的即采用：
+选好设备后点「立即激活」。工具会自动按顺序尝试三种启动方式，第一个成功的即采用：
 
-```
-/sdcard/Android/data/moe.shizuku.privileged.api/start.sh
-/storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh
-/data/local/tmp/shizuku_starter
+| 顺序 | 方案 | 适用 | 说明 |
+|---|---|---|---|
+| 1 | **app_process 直启** | Android 10/11+，任意版本 | 用 `pm path` 定位 APK，再直接拉起服务进程。**完全绕开文件系统限制** |
+| 2 | **start.sh 直跑** | Android 10 及以下、旧版 Shizuku | 官方经典方案，Android 11+ 会被系统拒绝（属预期） |
+| 3 | **starter 复制执行** | Shizuku v13.6 | 官方推荐把 native starter 复制到 `/data/local/tmp` 再跑 |
+
+**为什么 app_process 直启是首选**
+
+Android 11 起，系统收紧了分区存储，`/sdcard/Android/data/<包名>/` 对 adb shell（UID 2000）返回 **Permission denied**——官方的 `adb shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh` 在 Android 11+ 上**必然失败**。而 Shizuku v13.7.0（2026-10-26）起更是彻底移除了 `start.sh`，改用 native starter。
+
+`app_process` 直启完全不需要读那个目录：
+
+```bash
+# 1) 用 pm path 拿到 APK 路径（系统命令，不受分区存储限制）
+adb shell pm path moe.shizuku.privileged.api
+# package:/data/app/~~xxx==/moe.shizuku.privileged.api-yyy==/base.apk
+
+# 2) 直接以 shell 身份拉起服务进程
+adb shell "/system/bin/app_process \
+  -Djava.class.path=/data/app/~~xxx==/.../base.apk \
+  /system/bin --nice-name=shizuku_server \
+  rikka.shizuku.server.ShizukuService"
 ```
 
-不同 ROM 和版本存放位置不一样，多路径兜底能显著提高一次成功率。这条路径列表可以在设置里改。
+这正是 Shizuku 内部 native starter 干的事，只是省掉了「拷贝 starter 文件」这一步。
+
+**点「设备诊断」** 可以看到每一环的检测结果：应用是否安装、Android 版本、Android/data 是否可读、start.sh 是否存在、app_process 是否可用、服务是否在跑，并给出对应的行动建议。
 
 ### 4. 状态确认
 
@@ -134,10 +163,13 @@ npm run build
 ## 常见问题
 
 **找不到 start.sh 脚本**
-手机上的 Shizuku 没初始化过。打开手机上的 Shizuku，进「无线调试」页完成一次配对或启动动作，再回来重试。
+Android 11+ 上这是**正常现象**，不是工具坏了。分区存储限制让 adb 读不到 `Android/data`，而 Shizuku v13.7+ 连该脚本都移除了。工具会自动改用 app_process 直启，你什么都不用做。
 
 **Permission denied**
-按上面厂商定制表格处理，MIUI 的「USB 调试（安全设置）」是最常见原因。
+同样是分区存储限制（不是权限没开）。工具会自动换方案。只有 app_process 直启也失败时，才需要查手机端设置（MIUI 的「USB 调试（安全设置）」、ColorOS 的「权限监控」）。
+
+**提示未安装 Shizuku 应用**
+手机上确实没装，或装的是修改版导致包名不对。从官方渠道安装后打开一次即可。
 
 **设备显示 unauthorized**
 手机上的授权弹窗没确认。撤销 USB 调试授权 → 重新插线 → 重新勾选。
