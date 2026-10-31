@@ -1,8 +1,0 @@
-node_modules/
-dist/
-.cache/
-out/
-*.exe
-*.zip
-*.blockmap
-logs/
