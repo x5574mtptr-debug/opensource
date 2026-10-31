@@ -19,7 +19,7 @@
 |--------|------|----------|
 | [`米环测试demo/`](米环测试demo/) | 米环全能测试快应用，含蓝牙、定位、网络、录音、传感器、系统、振动等页面 | [BUILD.md](米环测试demo/BUILD.md) |
 | [`伪装软件v1/`](伪装软件v1/) | 手表端「伪装配件 / 隐私隐身」类快应用，仅声明 router/app/battery 三项基础能力 | [BUILD.md](伪装软件v1/BUILD.md) |
-| [`67 语音助手/`](67%20语音助手/) | 基于 Vela 的语音助手项目，含 `manifest.json`、页面与公共资源 | — |
+| [`67 语音助手/`](67%20语音助手/) | 基于 Vela 的**离线 AI 对话助手**，内置问答库 | [`BUILD.md`](67%20语音助手/BUILD.md) |
 | `explore.js` / `list_files.js` / `list_pages.js` / `list_src.js` | 用于分析 Vela 包结构的探索脚本 | — |
 | [`test/`](test/) | 测试项目的构建产物与资源 | — |
 
@@ -42,7 +42,7 @@ npm run release    # 构建签名发布包（.rpk）
 
 - `米环测试demo/` —— 小米手环测试 Demo（Xiaomi Vela 快应用），含蓝牙、定位、网络、录音、传感器、系统、振动等页面的源码（`src/`）与构建产物（`build/`、`dist/`）。
 - `伪装软件v1/` —— 手表端「伪装配件 / 隐私隐身」类快应用；`manifest.json` 仅声明 `system.router`、`system.app`、`system.battery` 三项基础能力，不含网络、定位、录音等敏感权限。
-- `67 语音助手/` —— 基于 Vela 的语音助手项目，含 `manifest.json`、页面（`src/pages`）与公共资源。
+- `67 语音助手/` —— 基于 Vela 的**离线 AI 对话助手**（手表端），内置关键词问答库 `src/common/qa.js`，无需联网即可对话。
 - `explore.js` / `list_files.js` / `list_pages.js` / `list_src.js` —— 用于分析 Vela 包结构的探索脚本。
 - `test/build/` —— 测试项目的构建产物与资源。
 
