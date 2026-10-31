@@ -1,0 +1,28 @@
+name: Bug 报告
+description: 报告一个可复现的问题
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 发生了什么？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 一步一步怎么操作能稳定复现？
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 你期望发生什么？
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 设备型号 / Vela 固件版本 / Node 版本
