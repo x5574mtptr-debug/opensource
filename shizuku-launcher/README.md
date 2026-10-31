@@ -6,6 +6,17 @@
 
 ---
 
+## 界面结构
+
+左侧两个大区：
+
+| 专区 | 内容 |
+|---|---|
+| **Shizuku 激活** | 四步向导（环境准备 → 设备连接 → 激活服务 → 状态确认），顶部用分段控件切换 |
+| **Fastboot 专区** | 底层刷机模式：设备列表、刷入镜像、解锁 Bootloader、清理数据、重启 |
+
+---
+
 ## 它解决什么问题
 
 手动激活 Shizuku 要做这些事：
@@ -19,8 +30,8 @@
 这个工具把上面每一步都变成界面上的一个按钮，并且：
 
 - **没有 adb 也能用** —— 一键下载 Google 官方 platform-tools
-- **日志完整** —— 每条 adb 命令、返回码、stderr 全部落盘可导出
-- **配置好调** —— 所有参数（脚本路径、端口、轮询间隔、镜像源）都能在设置里改，也能在 `config.json` 里直接编辑
+- **日志完整** —— 每条 adb / fastboot 命令、返回码、stderr 全部落盘可导出
+- **配置好调** —— 所有参数（脚本路径、端口、轮询间隔、镜像源、fastboot 路径）都能在设置里改，也能在 `config.json` 里直接编辑
 
 ---
 
@@ -182,6 +193,47 @@ Shizuku 被系统限制后台联网了。到电池优化/后台管理里把它�
 
 ---
 
+## Fastboot 专区
+
+Fastboot 是 Android 的底层刷机模式，功能比 adb 更底层（直接和 bootloader 通信）。
+
+### 进入方式
+
+- 关机状态下按住「音量下 + 电源」开机
+- 或已连 adb 时执行 `adb reboot bootloader`
+- 部分机型是「音量上 + 音量下 + 电源」
+
+进入后回到工具的 Fastboot 专区点「刷新」。
+
+### 支持的操作
+
+| 分组 | 操作 |
+|---|---|
+| 重启 | 重启系统 / 重启到 Bootloader / 重启到 Recovery |
+| 刷入镜像 | 刷入 boot / recovery / vbmeta / ZIP 包 / 临时启动镜像 |
+| Bootloader | 解锁 / 锁定 |
+| 清理数据 | 清除缓存 / 清除用户数据 / 格式化并恢复出厂 |
+
+刷入类操作需要先在界面上「浏览…」选择镜像文件（`.img` / `.zip` / `.bin` 等）。
+
+### 安全设计
+
+高风险操作会弹出**二次确认**，并明确告知后果：
+
+- **解锁 Bootloader** —— 会清除全部数据，且可能导致银行/支付类应用无法使用
+- **清除用户数据 / 格式化** —— 等同恢复出厂，资料全丢
+- **刷入镜像** —— 镜像必须与机型、版本完全匹配，否则可能变砖
+
+确认框里会显示即将执行的完整命令原文，方便核对。
+
+### 注意
+
+- `fastboot.exe` 随 Google SDK Platform-Tools 一起分发，**通常与 adb.exe 同目录**，工具会自动找到；找不到时可在设置里手动指定路径。
+- 操作期间不要拔数据线。
+- 如果只是想给应用授权系统 API，**不需要 fastboot**，用 Shizuku 激活专区就够了。
+
+---
+
 ## 配置
 
 配置在 `%APPDATA%\shizuku-launcher\config.json`，设置界面和这个文件是同一份，改哪个都生效。
@@ -189,6 +241,7 @@ Shizuku 被系统限制后台联网了。到电池优化/后台管理里把它�
 ```jsonc
 {
   "adbPath": "",                    // 手动指定 adb.exe；留空自动探测
+  "fastbootPath": "",               // 手动指定 fastboot.exe；留空自动探测
   "autoDownloadAdb": true,          // 没 adb 时自动下载
   "platformToolsMirror": "https://dl.google.com/android/repository/platform-tools-latest-windows.zip",
   "startScriptPaths": [             // 启动脚本路径，按顺序尝试
@@ -233,22 +286,28 @@ shizuku-launcher/
 │   ├── main/
 │   │   ├── main.js       Electron 主进程、窗口、IPC 注册
 │   │   ├── adb.js        adb 定位 / 下载 / 命令执行
-│   │   ├── shizuku.js    设备、配对、激活、状态探测
+│   │   ├── shizuku.js    设备、配对、激活、状态探测、诊断
+│   │   ├── fastboot.js   fastboot 定位 / 设备枚举 / 操作封装 / 风险分级
 │   │   ├── logger.js     日志系统（分级 / 落盘 / 轮转 / 推送）
 │   │   └── config.js     配置读写（原子写入 + 深合并）
 │   ├── preload/
 │   │   └── preload.js    contextBridge 安全桥
 │   └── renderer/
-│       ├── index.html    界面结构
+│       ├── index.html    界面结构（两大区）
 │       ├── styles.css    样式（浅色 / 深色）
 │       └── renderer.js   界面逻辑
 ├── scripts/
 │   ├── make-icon.js      纯 Node 生成 PNG / ICO 图标
+│   ├── make-launcher.js  生成纯 ASCII 的启动器 .bat
+│   ├── refactor-nav.js   导航结构重构脚本（一次性）
+│   ├── ui-tour.js        UI 巡检（逐屏截图）
 │   └── postinstall.js    Electron 下载镜像探测
 └── test/
-    ├── core.test.js      核心逻辑测试（27 项）
+    ├── core.test.js      核心逻辑测试（48 项）
     ├── fake-adb.js       假 adb 实现
-    └── fake-adb.bat      假 adb 包装器
+    ├── fake-adb.bat      假 adb 包装器
+    ├── fake-fastboot.js  假 fastboot 实现
+    └── fastboot.bat      假 fastboot 包装器
 ```
 
 ### 跑测试
@@ -259,7 +318,7 @@ shizuku-launcher/
 node test/core.test.js
 ```
 
-用假 adb 桩覆盖配置、日志、adb 定位与执行、设备枚举、无线配对、激活、状态探测、错误诊断、导出等 27 个场景。
+用假 adb / 假 fastboot 桩覆盖配置、日志、adb 与 fastboot 定位、设备枚举、无线配对、激活、状态探测、设备诊断、fastboot 刷入/解锁/清理、错误诊断、导出等 48 个场景。
 
 ### 调 UI
 
