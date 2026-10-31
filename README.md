@@ -58,3 +58,14 @@ npm run release    # 构建签名发布包（.rpk）
 本项目以 [MIT License](LICENSE) 开源。
 
 Copyright © 2026 linkshu (x5574mtptr-debug)
+
+## 参与贡献
+
+欢迎提交 Issue 与 Pull Request 来一起完善这些折腾成果。
+
+- 报告问题：使用 [Bug 报告模板](.github/ISSUE_TEMPLATE/bug_report.yml)
+- 提出建议：使用 [功能建议模板](.github/ISSUE_TEMPLATE/feature_request.yml)
+- 提交代码：请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，并遵循 [PR 模板](.github/PULL_REQUEST_TEMPLATE.md)
+- 安全漏洞：请勿在公开 Issue 披露，详见 [SECURITY.md](SECURITY.md)
+
+提交前请确保：已本地 `npm run build` 通过；未提交 `node_modules` / `build` / `dist` / `*.rpk` 等产物。
