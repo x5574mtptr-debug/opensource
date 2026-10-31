@@ -20,6 +20,15 @@ let passed = 0;
 let failed = 0;
 const failures = [];
 
+/* ---- 假设备状态读写（与 fake-adb.js 共用同一个文件） ---- */
+const FAKE_STATE = path.join(__dirname, 'fake-adb-state.json');
+function readFakeState() {
+  try { return JSON.parse(fs.readFileSync(FAKE_STATE, 'utf8')); } catch (_) { return {}; }
+}
+function writeFakeState(s) {
+  fs.writeFileSync(FAKE_STATE, JSON.stringify(s, null, 2), 'utf8');
+}
+
 function test(name, fn) {
   return Promise.resolve()
     .then(fn)
@@ -210,7 +219,87 @@ async function main() {
     c2.set('startScriptPaths', orig);
   });
 
-  console.log('\n[8] 日志导出');
+  console.log('\n[8] app_process 直启（Android 11+ 方案）');
+  await test('能通过 pm path 定位 APK', async () => {
+    const r = await shizuku.getManagerApkPath('FAKE1234');
+    assert.strictEqual(r.ok, true, r.error);
+    assert.ok(r.apkPath.includes('base.apk'));
+    assert.ok(r.libDir.includes('lib/arm64'));
+  });
+  await test('app_process 直启可成功激活', async () => {
+    // 重置服务状态
+    const st = readFakeState();
+    st.shizukuStarted = false;
+    writeFakeState(st);
+
+    const r = await shizuku.activate('FAKE1234');
+    assert.strictEqual(r.ok, true, r.message);
+    assert.strictEqual(r.method, 'app_process（基础）');
+    assert.ok(r.command.includes('app_process'));
+    assert.ok(r.command.includes('rikka.shizuku.server.ShizukuService'));
+  });
+  await test('app_process 直启会先清理残留进程', async () => {
+    const st = readFakeState();
+    st.shizukuStarted = false;
+    writeFakeState(st);
+    const r = await shizuku.activate('FAKE1234');
+    assert.strictEqual(r.ok, true);
+    // 日志里应出现清理旧进程的记录
+    const hist = logger.history(300).map((e) => e.message).join('\n');
+    assert.ok(/清理残留|app_process/.test(hist));
+  });
+
+  console.log('\n[9] 设备诊断');
+  await test('诊断能返回全部检查项', async () => {
+    const st = readFakeState();
+    st.shizukuStarted = false;
+    writeFakeState(st);
+    const d = await shizuku.diagnose('FAKE1234');
+    assert.ok(Array.isArray(d.items));
+    assert.ok(d.items.length >= 6, '应至少 6 项检查');
+    assert.ok(d.summary && d.summary.title && d.summary.advice);
+  });
+  await test('诊断能识别 Android/data 权限限制', async () => {
+    const st = readFakeState();
+    st.androidDataReadable = false;
+    writeFakeState(st);
+    const d = await shizuku.diagnose('FAKE1234');
+    const item = d.items.find((i) => i.name.includes('Android/data'));
+    assert.ok(item, '应有 Android/data 检查项');
+    assert.strictEqual(item.state, 'warn');
+    assert.ok(/权限被拒|不可访问|未找到/.test(item.detail), item.detail);
+  });
+  await test('诊断结论指向 app_process 方案', async () => {
+    const st = readFakeState();
+    st.androidDataReadable = false;
+    st.shizukuStarted = false;
+    writeFakeState(st);
+    const d = await shizuku.diagnose('FAKE1234');
+    assert.ok(/分区存储|app_process/.test(d.summary.title + d.summary.advice),
+      '结论应指向分区存储限制或 app_process 方案: ' + d.summary.title + ' | ' + d.summary.advice);
+  });
+  await test('服务运行时诊断结论为正常', async () => {
+    const st = readFakeState();
+    st.shizukuStarted = true;
+    writeFakeState(st);
+    const d = await shizuku.diagnose('FAKE1234');
+    assert.strictEqual(d.summary.level, 'ok');
+  });
+  await test('未安装 Shizuku 时诊断报错', async () => {
+    const st = readFakeState();
+    st.shizukuStarted = false;
+    st.packageMissing = true;
+    writeFakeState(st);
+    const d = await shizuku.diagnose('FAKE1234');
+    const item = d.items.find((i) => i.name.includes('Shizuku 应用'));
+    assert.strictEqual(item.state, 'err');
+    assert.strictEqual(d.summary.level, 'err');
+    // 复原
+    st.packageMissing = false;
+    writeFakeState(st);
+  });
+
+  console.log('\n[10] 日志导出');
   await test('导出合并日志', () => {
     const target = path.join(tmp, 'export.txt');
     const r = logger.exportAll(target);
