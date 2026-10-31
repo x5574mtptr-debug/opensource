@@ -270,7 +270,11 @@ async function refreshDevices() {
 function onDeviceSelected(d) {
   $('#activateTarget').textContent = d.serial;
   $('#activateTarget').className = 'tag brand';
-  const cmd = `adb -s ${d.serial} shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh`;
+  // 预览首选方案（app_process 直启，绕过 Android/data 限制）
+  const cmd =
+    `adb -s ${d.serial} shell "/system/bin/app_process ` +
+    `-Djava.class.path=\$(pm path moe.shizuku.privileged.api | sed 's/package://') ` +
+    `/system/bin --nice-name=shizuku_server rikka.shizuku.server.ShizukuService"`;
   $('#cmdPreview').textContent = cmd;
   toast('info', '已选择设备', d.model || d.serial);
 }
@@ -340,8 +344,10 @@ async function doActivate() {
 
   if (res.ok) {
     box.className = 'result-box ok';
+    const methodText = res.method ? `使用的方案：${escapeHtml(res.method)}` : '';
+    const cmdText = res.command ? `<pre>${escapeHtml(res.command)}</pre>` : '';
     box.innerHTML = `<b>激活成功</b>${escapeHtml(res.message || '')}
-      ${res.path ? `<pre>使用的脚本路径：${escapeHtml(res.path)}</pre>` : ''}`;
+      ${methodText ? `<pre>${methodText}</pre>` : ''}${cmdText}`;
     setGlobalStatus('running', 'Shizuku 运行中');
     setBadge('activate', 'ok');
     setBadge('verify', 'ok');
@@ -352,13 +358,73 @@ async function doActivate() {
     updateVerifyView();
   } else {
     box.className = 'result-box err';
-    const attempts = (res.attempts || []).map((a) => `· ${a.path}\n  exit=${a.code} ${a.output || ''}`).join('\n');
+    const attempts = (res.attempts || [])
+      .map((a) =>
+        a.method
+          ? `· ${a.method}\n  ${a.ok ? '成功' : a.output || '失败'}`
+          : `· ${a.path}\n  exit=${a.code} ${a.output || ''}`
+      )
+      .join('\n');
     box.innerHTML = `<b>激活失败</b>${escapeHtml(res.message || '未知错误')}
-      ${attempts ? `<pre>${escapeHtml(attempts)}</pre>` : ''}`;
+      ${attempts ? `<pre>${escapeHtml(attempts)}</pre>` : ''}
+      <pre>提示：点击「设备诊断」可查看详细检测结果。</pre>`;
     setGlobalStatus('stopped', '激活失败');
     setBadge('activate', 'err');
-    toast('err', '激活失败', res.message);
+    toast('err', '激活失败', res.message, 6000);
   }
+}
+
+/* ================= 设备诊断 ================= */
+async function runDiagnose() {
+  if (!state.selected) {
+    toast('warn', '请先选择设备', '在「设备连接」步骤中选择一台设备');
+    gotoStep('device');
+    return;
+  }
+  const btn = $('#btnDiagnose');
+  const panel = $('#diagPanel');
+  btn.disabled = true;
+  panel.hidden = false;
+  panel.innerHTML = '<div class="diag-head"><div class="diag-head-title"><span class="dot" style="background:var(--brand)"></span>正在检测…</div></div>';
+  setGlobalStatus('working', '诊断中');
+
+  const res = await window.api.diagnose(state.selected);
+  btn.disabled = false;
+
+  if (!res || !res.items) {
+    panel.innerHTML = '<div class="diag-head"><div class="diag-head-title err"><span class="dot"></span>诊断失败</div></div>';
+    setGlobalStatus('', '诊断失败');
+    return;
+  }
+
+  const s = res.summary || { level: 'warn', title: '诊断完成', advice: '' };
+  const levelText = { ok: '一切正常', warn: '需要注意', err: '存在问题' }[s.level] || '诊断完成';
+
+  const itemsHtml = res.items
+    .map((i) => {
+      const mark = { ok: '✓', warn: '!', err: '✕' }[i.state] || '·';
+      return `<div class="diag-item ${i.state}">
+        <span class="diag-state">${mark}</span>
+        <div class="diag-text">
+          <b>${escapeHtml(i.name)}</b>
+          ${i.detail ? `<small>${escapeHtml(i.detail)}</small>` : ''}
+        </div>
+      </div>`;
+    })
+    .join('');
+
+  panel.innerHTML = `
+    <div class="diag-head">
+      <div class="diag-head-title ${s.level}">
+        <span class="dot"></span>${escapeHtml(s.title)}
+        <span class="tag ${s.level === 'ok' ? 'ok' : s.level === 'err' ? 'err' : 'warn'}" style="margin-left:auto">${levelText}</span>
+      </div>
+      <p>${escapeHtml(s.advice)}</p>
+    </div>
+    <div class="diag-list">${itemsHtml}</div>`;
+
+  setGlobalStatus(s.level === 'ok' ? 'running' : s.level === 'err' ? 'stopped' : '', s.title);
+  toast(s.level === 'ok' ? 'ok' : s.level === 'err' ? 'err' : 'warn', s.title, s.advice, 6000);
 }
 
 /* ================= 状态检测 ================= */
@@ -494,6 +560,7 @@ async function init() {
   $('#btnPair').addEventListener('click', doPair);
   $('#btnWirelessConnect').addEventListener('click', doWirelessConnect);
   $('#btnActivate').addEventListener('click', doActivate);
+  $('#btnDiagnose').addEventListener('click', runDiagnose);
   $('#btnCheckStatus').addEventListener('click', checkStatus);
   $('#btnStartPolling').addEventListener('click', async () => {
     await checkStatus();
