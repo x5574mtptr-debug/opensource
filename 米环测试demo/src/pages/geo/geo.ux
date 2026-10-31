@@ -1,0 +1,154 @@
+<template>
+  <div class="page">
+    <text class="page-title">{{ $t("test.geo") }}</text>
+    
+    <div class="card">
+      <text class="card-title">当前位置（一次性获取）</text>
+      <text class="data" if="{{hasLocation}}">经度: {{longitude}}</text>
+      <text class="data" if="{{hasLocation}}">纬度: {{latitude}}</text>
+      <text class="data" if="{{hasLocation}}">海拔: {{altitude}} m</text>
+      <text class="data" if="{{hasLocation}}">速度: {{speed}} m/s</text>
+      <text class="data" if="{{hasLocation}}">精度: {{accuracy}} m</text>
+      <text class="data gray" if="{{!hasLocation && !locating && !locFail}}">未获取</text>
+      <text class="data gray" if="{{locating}}">正在定位...</text>
+      <text class="data red" if="{{locFail}}">定位失败（设备不支持或超时）</text>
+      <input class="btn small" type="button" value="获取位置" onclick="getLocationData" />
+    </div>
+    
+    <div class="card">
+      <text class="card-title">实时位置监听</text>
+      <text class="data" if="{{subscribing}}">纬度: {{subLat}}, 经度: {{subLng}}</text>
+      <text class="data gray" if="{{!subscribing}}">未监听</text>
+      <block if="{{subscribing}}">
+        <input class="btn small" type="button" value="停止监听" onclick="toggleSubscribe" />
+      </block>
+      <block else>
+        <input class="btn small" type="button" value="开始监听" onclick="toggleSubscribe" />
+      </block>
+    </div>
+    
+    <input class="btn" type="button" value="{{ $t('test.back') }}" onclick="goBack" />
+  </div>
+</template>
+
+<script>
+import router from '@system.router'
+import geolocation from '@system.geolocation'
+
+export default {
+  private: {
+    hasLocation: false,
+    locating: false,
+    locFail: false,
+    longitude: 0,
+    latitude: 0,
+    altitude: 0,
+    speed: 0,
+    accuracy: 0,
+    subscribing: false,
+    subLat: '--',
+    subLng: '--'
+  },
+
+  goBack() {
+    if (this.subscribing) geolocation.unsubscribe()
+    router.back()
+  },
+
+  onDestroy() {
+    if (this.subscribing) geolocation.unsubscribe()
+  },
+
+  getLocationData() {
+    this.locating = true
+    this.locFail = false
+    geolocation.getLocation({
+      timeout: 10000,
+      success: (ret) => {
+        this.longitude = ret.longitude.toFixed(6)
+        this.latitude = ret.latitude.toFixed(6)
+        this.altitude = (ret.altitude || 0).toFixed(1)
+        this.speed = (ret.speed || 0).toFixed(1)
+        this.accuracy = ret.accuracy || 0
+        this.hasLocation = true
+        this.locating = false
+      },
+      fail: (data, code) => {
+        this.locating = false
+        this.locFail = true
+        console.log('Geo fail:', code)
+      }
+    })
+  },
+
+  toggleSubscribe() {
+    if (this.subscribing) {
+      geolocation.unsubscribe()
+      this.subscribing = false
+    } else {
+      geolocation.subscribe({
+        callback: (ret) => {
+          this.subLat = ret.latitude.toFixed(4)
+          this.subLng = ret.longitude.toFixed(4)
+          this.subscribing = true
+        },
+        fail: (data, code) => {
+          console.log('Geo sub fail:', code)
+        }
+      })
+    }
+  }
+}
+</script>
+
+<style>
+.page {
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  width: 100%;
+}
+.page-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+.card {
+  flex-direction: column;
+  width: 100%;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-size: 14px;
+  color: #9c27b0;
+  margin-bottom: 6px;
+}
+.data {
+  font-size: 16px;
+  color: #ffffff;
+  margin: 2px 0;
+}
+.gray { color: #666; }
+.red { color: #ff5252; }
+.btn {
+  width: 200px;
+  height: 40px;
+  border-radius: 20px;
+  background-color: #007aff;
+  font-size: 16px;
+  color: #ffffff;
+  margin-top: 10px;
+}
+.small {
+  width: 120px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: 12px;
+  background-color: #9c27b0;
+  margin-top: 6px;
+}
+</style>

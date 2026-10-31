@@ -1,0 +1,182 @@
+<template>
+  <div class="container">
+    <!-- 对话列表 -->
+    <scroll-view class="message-list" scroll-y="true">
+      <div for="(item, index) in messages" class="message-item {{item.type}}">
+        <text class="message-text">{{item.text}}</text>
+      </div>
+    </scroll-view>
+    
+    <!-- 输入区域 -->
+    <div class="input-area">
+      <input 
+        class="input-box" 
+        type="text" 
+        placeholder="输入问题..." 
+        value="{{inputText}}"
+        onchange="onInputChange"
+        onfocus="onInputFocus"
+      />
+      <button class="send-btn" onclick="onSend">发送</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import qaData from '../../common/qa'
+
+export default {
+  private: {
+    messages: [],
+    inputText: '',
+    lastUserInput: ''
+  },
+
+  onInit() {
+    // 初始化欢迎消息
+    this.messages.push({
+      type: 'assistant',
+      text: '你好！我是 67 语音助手，有什么可以帮你的？'
+    });
+  },
+
+  onInputChange(e) {
+    this.inputText = e.value;
+  },
+
+  onInputFocus() {
+    // 聚焦时滚动到底部
+    this.scrollToBottom();
+  },
+
+  onSend() {
+    if (!this.inputText.trim()) return;
+    
+    // 添加用户消息
+    const userText = this.inputText.trim();
+    this.messages.push({
+      type: 'user',
+      text: userText
+    });
+    
+    this.lastUserInput = userText;
+    this.inputText = '';
+    
+    // 匹配回复
+    const reply = this.findReply(userText);
+    
+    // 延迟显示回复，模拟思考
+    var self = this;
+    setTimeout(function() {
+      self.messages.push({
+        type: 'assistant',
+        text: reply
+      });
+      self.scrollToBottom();
+    }, 300);
+    
+    this.scrollToBottom();
+  },
+
+  findReply(input) {
+    // 转小写匹配
+    const lowerInput = input.toLowerCase();
+    
+    // 遍历问答库匹配
+    for (let i = 0; i < qaData.length; i++) {
+      const qa = qaData[i];
+      
+      // 精确匹配
+      if (qa.keywords.includes(lowerInput)) {
+        return qa.answers[Math.floor(Math.random() * qa.answers.length)];
+      }
+      
+      // 关键词匹配
+      for (let j = 0; j < qa.keywords.length; j++) {
+        if (lowerInput.includes(qa.keywords[j])) {
+          return qa.answers[Math.floor(Math.random() * qa.answers.length)];
+        }
+      }
+    }
+    
+    // 默认回复
+    return '抱歉，我还没学会这个问题。你可以问我其他问题哦！';
+  },
+
+  scrollToBottom() {
+    // 延迟滚动确保内容渲染完成
+    var self = this;
+    setTimeout(function() {
+      // 手环 scroll-view 可能需要特定 API
+    }, 100);
+  }
+}
+</script>
+
+<style>
+.container {
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: #1a1a2e;
+}
+
+.message-list {
+  flex: 1;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.message-item {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  max-width: 80%;
+}
+
+.message-item.user {
+  background-color: #4a69bd;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+.message-item.assistant {
+  background-color: #2d3436;
+  align-self: flex-start;
+}
+
+.message-text {
+  font-size: 14px;
+  color: #ffffff;
+  line-height: 1.4;
+}
+
+.input-area {
+  flex-direction: row;
+  padding: 10px;
+  background-color: #16213e;
+  align-items: center;
+}
+
+.input-box {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: #ffffff;
+  background-color: #2d3436;
+  border-radius: 20px;
+  margin-right: 8px;
+}
+
+.send-btn {
+  width: 60px;
+  height: 40px;
+  background-color: #4a69bd;
+  color: #ffffff;
+  font-size: 14px;
+  border-radius: 20px;
+  text-align: center;
+  line-height: 40px;
+}
+</style>

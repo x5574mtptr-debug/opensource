@@ -1,0 +1,138 @@
+<template>
+  <div class="page">
+    <text class="page-title">{{ $t("test.recorder") }}</text>
+    
+    <div class="card">
+      <text class="card-title">录音测试</text>
+      <text class="data" if="{{!recording && !hasFile}}">点击开始录音进行测试</text>
+      <text class="data" if="{{recording}}">录音中...</text>
+      <text class="data" if="{{hasFile}}">录音文件: {{fileUri}}</text>
+      <text class="data gray" if="{{recFail}}">录音失败（设备不支持）</text>
+      <div class="row">
+        <input class="btn small" type="button" value="开始录音" onclick="startRec" />
+        <input class="btn small" type="button" value="停止" onclick="stopRec" />
+      </div>
+    </div>
+    
+    <div class="card">
+      <text class="card-title">录音参数</text>
+      <text class="data">采样率: 8000 Hz</text>
+      <text class="data">声道: 单声道</text>
+      <text class="data">格式: WAV</text>
+    </div>
+    
+    <input class="btn" type="button" value="{{ $t('test.back') }}" onclick="goBack" />
+  </div>
+</template>
+
+<script>
+import router from '@system.router'
+import record from '@system.record'
+
+export default {
+  private: {
+    recording: false,
+    hasFile: false,
+    fileUri: '',
+    recFail: false
+  },
+
+  goBack() {
+    if (this.recording) record.stop()
+    router.back()
+  },
+
+  onDestroy() {
+    if (this.recording) record.stop()
+  },
+
+  startRec() {
+    this.recFail = false
+    this.hasFile = false
+    record.start({
+      duration: 5000,
+      sampleRate: 8000,
+      numberOfChannels: 1,
+      format: 'wav',
+      encodeBitRate: 128000,
+      success: (ret) => {
+        this.fileUri = ret.uri
+        this.hasFile = true
+        this.recording = false
+        console.log('Recorder file saved:', ret.uri)
+      },
+      fail: (data, code) => {
+        this.recording = false
+        this.recFail = true
+        console.log('Recorder fail:', code)
+      },
+      complete: () => {
+        this.recording = false
+      }
+    })
+    this.recording = true
+  },
+
+  stopRec() {
+    record.stop()
+    this.recording = false
+  }
+}
+</script>
+
+<style>
+.page {
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  width: 100%;
+}
+.page-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+.card {
+  flex-direction: column;
+  width: 100%;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-size: 14px;
+  color: #f44336;
+  margin-bottom: 6px;
+}
+.data {
+  font-size: 16px;
+  color: #ffffff;
+  margin: 2px 0;
+}
+.gray { color: #666; }
+.row {
+  flex-direction: row;
+  justify-content: space-around;
+  width: 100%;
+  margin-top: 6px;
+}
+.btn {
+  width: 200px;
+  height: 40px;
+  border-radius: 20px;
+  background-color: #007aff;
+  font-size: 16px;
+  color: #ffffff;
+  margin-top: 10px;
+}
+.small {
+  width: 110px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: 12px;
+  background-color: #f44336;
+  margin: 0;
+}
+</style>
