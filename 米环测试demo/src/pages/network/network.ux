@@ -1,0 +1,123 @@
+<template>
+  <div class="page">
+    <text class="page-title">{{ $t("test.network") }}</text>
+    
+    <div class="card">
+      <text class="card-title">当前网络</text>
+      <text class="data">类型: {{netType}}</text>
+      <input class="btn small" type="button" value="刷新" onclick="refreshNet" />
+    </div>
+    
+    <div class="card">
+      <text class="card-title">网络变化监听</text>
+      <text class="data" if="{{listening}}">监听中: {{lastNetType}}</text>
+      <text class="data gray" if="{{!listening}}">未开启监听</text>
+      <input class="btn small" type="button" value="{{listening ? '停止监听' : '开始监听'}}" onclick="toggleListen" />
+    </div>
+    
+    <input class="btn" type="button" value="{{ $t('test.back') }}" onclick="goBack" />
+  </div>
+</template>
+
+<script>
+import router from '@system.router'
+import network from '@system.network'
+
+export default {
+  private: {
+    netType: '--',
+    listening: false,
+    lastNetType: '--'
+  },
+
+  goBack() {
+    if (this.listening) network.unsubscribe()
+    router.back()
+  },
+
+  onDestroy() {
+    if (this.listening) network.unsubscribe()
+  },
+
+  onInit() {
+    this.refreshNet()
+  },
+
+  refreshNet() {
+    network.getType({
+      success: (data) => {
+        var labels = { '2g': '2G', '3g': '3G', '4g': '4G', '5g': '5G', 'wifi': 'WiFi', 'none': 'none', 'bluetooth': 'BLE', 'others': 'others' }
+        this.netType = labels[data.type] || data.type
+      },
+      fail: () => { this.netType = 'fail' }
+    })
+  },
+
+  toggleListen() {
+    if (this.listening) {
+      network.unsubscribe()
+      this.listening = false
+    } else {
+      network.subscribe({
+        callback: (data) => {
+          var labels = { '2g': '2G', '3g': '3G', '4g': '4G', '5g': '5G', 'wifi': 'WiFi', 'none': 'none', 'bluetooth': 'BLE', 'others': 'others' }
+          this.lastNetType = labels[data.type] || data.type
+        },
+        fail: () => { this.lastNetType = 'fail' }
+      })
+      this.listening = true
+    }
+  }
+}
+</script>
+
+<style>
+.page {
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  width: 100%;
+}
+.page-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+.card {
+  flex-direction: column;
+  width: 100%;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-size: 14px;
+  color: #4caf50;
+  margin-bottom: 6px;
+}
+.data {
+  font-size: 16px;
+  color: #ffffff;
+  margin: 2px 0;
+}
+.gray { color: #666; }
+.btn {
+  width: 200px;
+  height: 40px;
+  border-radius: 20px;
+  background-color: #007aff;
+  font-size: 16px;
+  color: #ffffff;
+  margin-top: 10px;
+}
+.small {
+  width: 120px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: 12px;
+  margin-top: 6px;
+  background-color: #4caf50;
+}
+</style>

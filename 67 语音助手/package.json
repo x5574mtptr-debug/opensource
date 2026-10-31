@@ -1,0 +1,17 @@
+{
+  "name": "67-assistant",
+  "version": "1.0.0",
+  "description": "67 语音助手 - 离线 AI 对话助手",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@aiot-toolkit/aiotpack": "^2.0.5"
+  }
+}

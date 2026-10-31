@@ -1,0 +1,163 @@
+<template>
+  <div class="page">
+    <text class="page-title">振动测试</text>
+    
+    <div class="card">
+      <text class="card-title">基础振动</text>
+      <div class="row">
+        <input class="btn small" type="button" value="短振" onclick="vibrateShort" />
+        <input class="btn small" type="button" value="长振" onclick="vibrateLong" />
+      </div>
+    </div>
+    
+    <div class="card">
+      <text class="card-title">振动模式 (S5支持)</text>
+      <div class="row">
+        <input class="btn small" type="button" value="连续3次" onclick="vibratePattern1" />
+        <input class="btn small" type="button" value="急促5次" onclick="vibratePattern2" />
+      </div>
+      <div class="row">
+        <input class="btn small" type="button" value="长-短" onclick="vibratePattern3" />
+        <input class="btn small" type="button" value="重复10次" onclick="vibratePattern4" />
+      </div>
+      <input class="btn small full-w" type="button" value="停止振动" onclick="stopVib" />
+    </div>
+    
+    <div class="card">
+      <text class="card-title">系统振动模式</text>
+      <text class="data">当前模式: {{sysVibMode}}</text>
+    </div>
+    
+    <input class="btn" type="button" value="返回" onclick="goBack" />
+  </div>
+</template>
+
+<script>
+import router from '@system.router'
+import vibrator from '@system.vibrator'
+
+export default {
+  private: {
+    sysVibMode: '--',
+    _vibId: null
+  },
+
+  goBack() {
+    if (this._vibId !== null) vibrator.stop(this._vibId)
+    router.back()
+  },
+
+  onDestroy() {
+    if (this._vibId !== null) vibrator.stop(this._vibId)
+  },
+
+  onInit() {
+    try {
+      var mode = vibrator.getSystemDefaultMode()
+      var labels = { 0: '关闭', 1: '标准', 2: '加强' }
+      this.sysVibMode = labels[mode] || '未知'
+    } catch (e) {
+      this.sysVibMode = '不支持'
+    }
+  },
+
+  vibrateShort() {
+    vibrator.vibrate({ mode: 'short' })
+  },
+
+  vibrateLong() {
+    vibrator.vibrate({ mode: 'long' })
+  },
+
+  doStart(duration, interval, count) {
+    if (this._vibId !== null) {
+      vibrator.stop(this._vibId)
+      this._vibId = null
+    }
+    vibrator.start({
+      duration: duration,
+      interval: interval,
+      count: count,
+      success: (ret) => {
+        this._vibId = ret.id
+      },
+      fail: (data, code) => {
+        console.log('Vibrator start fail:', code)
+      }
+    })
+  },
+
+  vibratePattern1() { this.doStart(200, 300, 3) },
+  vibratePattern2() { this.doStart(100, 100, 5) },
+  vibratePattern3() { this.doStart(500, 200, 2) },
+  vibratePattern4() { this.doStart(150, 50, 10) },
+
+  stopVib() {
+    if (this._vibId !== null) {
+      vibrator.stop(this._vibId)
+      this._vibId = null
+    }
+  }
+}
+</script>
+
+<style>
+.page {
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  width: 100%;
+}
+.page-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+.card {
+  flex-direction: column;
+  width: 100%;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-size: 14px;
+  color: #e91e63;
+  margin-bottom: 6px;
+}
+.data {
+  font-size: 16px;
+  color: #ffffff;
+  margin: 2px 0;
+}
+.row {
+  flex-direction: row;
+  justify-content: space-around;
+  width: 100%;
+  margin: 4px 0;
+}
+.btn {
+  width: 200px;
+  height: 40px;
+  border-radius: 20px;
+  background-color: #007aff;
+  font-size: 16px;
+  color: #ffffff;
+  margin-top: 10px;
+}
+.small {
+  width: 85px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: 12px;
+  background-color: #e91e63;
+  margin: 3px;
+}
+.full-w {
+  width: 100%;
+  background-color: #ff5722;
+  margin-top: 6px;
+}
+</style>

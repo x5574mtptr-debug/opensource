@@ -1,0 +1,230 @@
+<template>
+  <div class="page">
+    <text class="page-title">系统信息</text>
+    
+    <div class="card" onclick="refreshBattery">
+      <text class="card-title">电量信息</text>
+      <text class="data">电量: {{batteryLevel}}</text>
+      <block if="{{charging}}">
+        <text class="data">充电中: 是</text>
+      </block>
+      <block else>
+        <text class="data">充电中: 否</text>
+      </block>
+      <text class="hint">点击刷新</text>
+    </div>
+    
+    <div class="card">
+      <text class="card-title">屏幕亮度</text>
+      <text class="data">当前亮度: {{brightness}} ({{brightPct}}%)</text>
+      <div class="row">
+        <input class="btn tiny" type="button" value="-" onclick="decBright" />
+        <progress class="bar" percent="{{brightPct}}" type="horizontal" />
+        <input class="btn tiny" type="button" value="+" onclick="incBright" />
+      </div>
+      <block if="{{brightMode === 0}}">
+        <text class="data">亮度模式: 手动</text>
+      </block>
+      <block else>
+        <text class="data">亮度模式: 自动</text>
+      </block>
+      <input class="btn small" type="button" value="切换模式" onclick="toggleBrightMode" />
+    </div>
+    
+    <div class="card">
+      <text class="card-title">系统音量</text>
+      <text class="data">媒体音量: {{volumePct}}%</text>
+      <div class="row">
+        <input class="btn tiny" type="button" value="-" onclick="decVol" />
+        <progress class="bar" percent="{{volPct}}" type="horizontal" />
+        <input class="btn tiny" type="button" value="+" onclick="incVol" />
+      </div>
+    </div>
+    
+    <div class="card">
+      <text class="card-title">设备信息</text>
+      <text class="data">包名: com.demo.bandtester</text>
+      <text class="data">版本: 1.0.0 (1)</text>
+    </div>
+    
+    <input class="btn" type="button" value="返回" onclick="goBack" />
+  </div>
+</template>
+
+<script>
+import router from '@system.router'
+import battery from '@system.battery'
+import bright from '@system.brightness'
+import volume from '@system.volume'
+
+export default {
+  private: {
+    batteryLevel: '--',
+    charging: false,
+    brightness: 128,
+    brightPct: 50,
+    brightMode: 0,
+    volumePct: 50,
+    volPct: 50
+  },
+
+  goBack() {
+    router.back()
+  },
+
+  onInit() {
+    this.refreshBattery()
+    this.refreshBright()
+    this.refreshVolume()
+    volume.onMediaValueChanged = (ret) => {
+      this.volumePct = Math.round(ret.value * 100)
+      this.volPct = Math.round(ret.value * 100)
+    }
+  },
+
+  refreshBattery() {
+    battery.getStatus({
+      success: (data) => {
+        this.batteryLevel = Math.round(data.level * 100) + '%'
+        this.charging = data.charging
+      },
+      fail: function() {
+        this.batteryLevel = 'not supported'
+      }
+    })
+  },
+
+  refreshBright() {
+    bright.getValue({
+      success: (data) => {
+        this.brightness = data.value
+        this.brightPct = Math.round(data.value / 255 * 100)
+      }
+    })
+    bright.getMode({
+      success: (data) => { this.brightMode = data.mode }
+    })
+  },
+
+  refreshVolume() {
+    volume.getMediaValue({
+      success: (data) => {
+        this.volumePct = Math.round(data.value * 100)
+        this.volPct = Math.round(data.value * 100)
+      }
+    })
+  },
+
+  toggleBrightMode() {
+    var newMode = this.brightMode === 0 ? 1 : 0
+    var self = this
+    bright.setMode({
+      mode: newMode,
+      success: function() { self.brightMode = newMode }
+    })
+  },
+
+  incBright() {
+    var v = Math.min(255, this.brightness + 15)
+    bright.setValue({ value: v })
+    this.brightness = v
+    this.brightPct = Math.round(v / 255 * 100)
+  },
+
+  decBright() {
+    var v = Math.max(0, this.brightness - 15)
+    bright.setValue({ value: v })
+    this.brightness = v
+    this.brightPct = Math.round(v / 255 * 100)
+  },
+
+  incVol() {
+    var v = Math.min(1.0, this.volumePct / 100 + 0.1)
+    volume.setMediaValue({ value: v })
+    this.volumePct = Math.round(v * 100)
+    this.volPct = Math.round(v * 100)
+  },
+
+  decVol() {
+    var v = Math.max(0, this.volumePct / 100 - 0.1)
+    volume.setMediaValue({ value: v })
+    this.volumePct = Math.round(v * 100)
+    this.volPct = Math.round(v * 100)
+  }
+}
+</script>
+
+<style>
+.page {
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  width: 100%;
+}
+.page-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+.card {
+  flex-direction: column;
+  width: 100%;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-size: 14px;
+  color: #ff9800;
+  margin-bottom: 6px;
+}
+.data {
+  font-size: 16px;
+  color: #ffffff;
+  margin: 2px 0;
+}
+.hint {
+  font-size: 12px;
+  color: #555;
+  margin-top: 4px;
+}
+.row {
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  margin: 6px 0;
+}
+.bar {
+  width: 100px;
+  height: 6px;
+  margin: 0 8px;
+  color: #ff9800;
+}
+.btn {
+  width: 200px;
+  height: 40px;
+  border-radius: 20px;
+  background-color: #007aff;
+  font-size: 16px;
+  color: #ffffff;
+  margin-top: 10px;
+}
+.small {
+  width: 100px;
+  height: 30px;
+  border-radius: 15px;
+  font-size: 12px;
+  margin-top: 6px;
+  background-color: #ff9800;
+}
+.tiny {
+  width: 40px;
+  height: 30px;
+  border-radius: 15px;
+  font-size: 18px;
+  background-color: #555555;
+  margin: 0;
+}
+</style>
