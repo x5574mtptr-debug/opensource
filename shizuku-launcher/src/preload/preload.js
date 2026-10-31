@@ -48,6 +48,15 @@ contextBridge.exposeInMainWorld('api', {
   getAndroidVersion: (serial) => ipcRenderer.invoke('shizuku:androidVersion', serial),
   onStatus: (cb) => on('shizuku:status', cb),
 
+  // Fastboot
+  locateFastboot: (opts) => ipcRenderer.invoke('fastboot:locate', opts),
+  fastbootDevices: () => ipcRenderer.invoke('fastboot:devices'),
+  fastbootInfo: (serial) => ipcRenderer.invoke('fastboot:info', serial),
+  fastbootPerform: (serial, action, extra) =>
+    ipcRenderer.invoke('fastboot:perform', { serial, action, extra }),
+  fastbootRisk: (action) => ipcRenderer.invoke('fastboot:risk', action),
+  pickFile: (filters) => ipcRenderer.invoke('dialog:pickFile', filters),
+
   // 应用
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   setAutoLaunch: (enabled) => ipcRenderer.invoke('app:setAutoLaunch', enabled),
