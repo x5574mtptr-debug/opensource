@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
+  <title>Shizuku 激活工具</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ============ 侧边栏 ============ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.35 6.19 20.4l1.11-6.47L2.6 9.35l6.5-.95L12 2.5z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Shizuku</h1>
+          <span>激活工具</span>
+        </div>
+      </div>
+
+      <nav class="steps" id="stepNav">
+        <button class="step-item is-active" data-step="env">
+          <span class="step-idx">1</span>
+          <span class="step-body">
+            <span class="step-title">环境准备</span>
+            <span class="step-desc">检查 adb 与工具链</span>
+          </span>
+          <span class="step-badge" id="badge-env"></span>
+        </button>
+        <button class="step-item" data-step="device">
+          <span class="step-idx">2</span>
+          <span class="step-body">
+            <span class="step-title">设备连接</span>
+            <span class="step-desc">USB 或无线调试</span>
+          </span>
+          <span class="step-badge" id="badge-device"></span>
+        </button>
+        <button class="step-item" data-step="activate">
+          <span class="step-idx">3</span>
+          <span class="step-body">
+            <span class="step-title">激活服务</span>
+            <span class="step-desc">一条命令启动</span>
+          </span>
+          <span class="step-badge" id="badge-activate"></span>
+        </button>
+        <button class="step-item" data-step="verify">
+          <span class="step-idx">4</span>
+          <span class="step-body">
+            <span class="step-title">状态确认</span>
+            <span class="step-desc">验证服务已运行</span>
+          </span>
+          <span class="step-badge" id="badge-verify"></span>
+        </button>
+      </nav>
+
+      <div class="side-foot">
+        <button class="side-link" id="btnOpenLogFolder">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+          日志目录
+        </button>
+        <button class="side-link" id="btnOpenSettings">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6 1.65 1.65 0 0010 3.09V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          设置
+        </button>
+      </div>
+    </aside>
+
+    <!-- ============ 主区域 ============ -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="viewTitle">环境准备</h2>
+          <p id="viewDesc">确认 adb 可用，这是激活 Shizuku 的前提</p>
+        </div>
+        <div class="topbar-right">
+          <div class="status-pill" id="globalStatus">
+            <span class="dot"></span>
+            <span class="status-text">未检测</span>
+          </div>
+          <button class="icon-btn" id="btnTheme" title="切换主题">
+            <svg class="ico-sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <svg class="ico-moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="content" id="content">
+        <!-- 步骤 1：环境 -->
+        <section class="view is-active" data-view="env">
+          <div class="card">
+            <div class="card-head">
+              <h3>ADB 工具链</h3>
+              <span class="tag" id="adbTag">未检测</span>
+            </div>
+            <p class="card-text">Shizuku 通过 ADB 在手机上拉起服务进程。若本机没有 adb，工具会自动下载 Google 官方 platform-tools。</p>
+            <div class="adb-detail" id="adbDetail"></div>
+            <div class="row-actions">
+              <button class="btn btn-primary" id="btnLocateAdb">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="8"/></svg>
+                检测 adb
+              </button>
+              <button class="btn" id="btnDownloadAdb">下载内置 adb</button>
+              <div class="progress-wrap" id="dlProgress" hidden>
+                <div class="progress"><div class="progress-bar" id="dlBar"></div></div>
+                <span class="progress-text" id="dlText">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>工作原理</h3></div>
+            <div class="flow">
+              <div class="flow-node"><span class="flow-num">1</span><b>手机开启 USB 调试</b><small>开发者选项 → USB 调试</small></div>
+              <div class="flow-arrow"></div>
+              <div class="flow-node"><span class="flow-num">2</span><b>电脑执行启动命令</b><small>adb shell sh …/start.sh</small></div>
+              <div class="flow-arrow"></div>
+              <div class="flow-node"><span class="flow-num">3</span><b>Shizuku 服务运行</b><small>其他应用获得 ADB 级权限</small></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>手机端准备</h3><span class="subtle">按你的机型操作</span></div>
+            <div class="checklist" id="checklist">
+              <div class="check-item" data-key="installed">
+                <span class="check-box"></span>
+                <div class="check-text"><b>已安装 Shizuku 应用</b><small>手机里能看到 Shizuku 图标，并至少打开过一次</small></div>
+              </div>
+              <div class="check-item" data-key="devmode">
+                <span class="check-box"></span>
+                <div class="check-text"><b>已开启开发者选项</b><small>连续点击「版本号」7 次</small></div>
+              </div>
+              <div class="check-item" data-key="usbdebug">
+                <span class="check-box"></span>
+                <div class="check-text"><b>已开启 USB 调试</b><small>部分机型还需开启「USB 调试（安全设置）」</small></div>
+              </div>
+              <div class="check-item" data-key="chargeonly">
+                <span class="check-box"></span>
+                <div class="check-text"><b>USB 模式设为「仅充电」</b><small>避免数据传输模式中断 ADB 会话</small></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 步骤 2：设备 -->
+        <section class="view" data-view="device">
+          <div class="card">
+            <div class="card-head">
+              <h3>已连接设备</h3>
+              <div class="head-tools">
+                <span class="tag" id="deviceCount">0 台</span>
+                <button class="btn btn-sm" id="btnRefreshDevices">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                  刷新
+                </button>
+              </div>
+            </div>
+            <div class="device-list" id="deviceList">
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                <p>暂无设备</p>
+                <small>连接手机后点击刷新，或使用无线调试连接</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>无线调试连接</h3><span class="subtle">Android 11+</span></div>
+            <p class="card-text">在手机「开发者选项 → 无线调试」中查看 IP 地址与端口，配对码为 6 位数字。</p>
+            <div class="form-grid">
+              <label class="field">
+                <span>设备 IP</span>
+                <input type="text" id="wlHost" placeholder="192.168.1.100" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>连接端口</span>
+                <input type="number" id="wlPort" placeholder="5555" value="5555" />
+              </label>
+              <label class="field">
+                <span>配对端口</span>
+                <input type="number" id="wlPairPort" placeholder="37129" />
+              </label>
+              <label class="field">
+                <span>配对码</span>
+                <input type="text" id="wlCode" placeholder="6 位数字" maxlength="6" inputmode="numeric" autocomplete="off" />
+              </label>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-primary" id="btnPair">配对</button>
+              <button class="btn" id="btnWirelessConnect">直接连接</button>
+              <span class="hint" id="wlHint"></span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 步骤 3：激活 -->
+        <section class="view" data-view="activate">
+          <div class="card">
+            <div class="card-head">
+              <h3>激活 Shizuku</h3>
+              <span class="tag" id="activateTarget">未选择设备</span>
+            </div>
+            <p class="card-text">将执行等价于以下命令（会自动尝试多个脚本路径以适配不同 ROM 与版本）：</p>
+            <div class="code-block">
+              <code id="cmdPreview">adb -s &lt;设备&gt; shell sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh</code>
+              <button class="btn btn-sm btn-ghost" id="btnCopyCmd">复制</button>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-primary btn-lg" id="btnActivate">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                立即激活
+              </button>
+              <button class="btn" id="btnLaunchApp">打开手机上的 Shizuku</button>
+            </div>
+            <div class="result-box" id="activateResult" hidden></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>常见问题速查</h3></div>
+            <div class="faq" id="faq">
+              <details><summary>提示找不到 start.sh 脚本</summary><p>说明手机上的 Shizuku 应用没有完成过初始化。打开手机上的 Shizuku 应用，进入「无线调试」页完成一次配对或启动动作，再回来重试。</p></details>
+              <details><summary>提示权限被拒绝（Permission denied）</summary><p>MIUI：开发者选项中开启「USB 调试（安全设置）」。ColorOS：关闭「权限监控」。Flyme：关闭「Flyme 支付保护」。</p></details>
+              <details><summary>设备显示 unauthorized</summary><p>手机上弹出「允许 USB 调试」时勾选「一律允许」并确认。若无弹窗，撤销 USB 调试授权后重新插拔数据线。</p></details>
+              <details><summary>激活成功但一会儿又失效</summary><p>手机重启后 ADB 会话结束，Shizuku 服务随之停止，属正常现象，重新激活即可。</p></details>
+            </div>
+          </div>
+        </section>
+
+        <!-- 步骤 4：验证 -->
+        <section class="view" data-view="verify">
+          <div class="card status-card">
+            <div class="card-head"><h3>服务状态</h3><span class="tag" id="verifyTag">未检测</span></div>
+            <div class="status-hero" id="statusHero">
+              <div class="status-icon" id="statusIcon">
+                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/></svg>
+              </div>
+              <div class="status-text-big" id="statusTitle">等待检测</div>
+              <p class="status-sub" id="statusSub">选择设备并激活后，这里会显示 Shizuku 的运行状态</p>
+            </div>
+            <div class="signal-grid" id="signalGrid">
+              <div class="signal" data-sig="process"><span class="sig-dot"></span><b>服务进程</b><small>shizuku_server</small></div>
+              <div class="signal" data-sig="binder"><span class="sig-dot"></span><b>Binder 注册</b><small>/proc/net/unix</small></div>
+              <div class="signal" data-sig="pkg"><span class="sig-dot"></span><b>应用已安装</b><small>moe.shizuku.privileged.api</small></div>
+            </div>
+            <div class="row-actions">
+              <button class="btn btn-primary" id="btnCheckStatus">检测状态</button>
+              <button class="btn" id="btnStartPolling">开始自动监控</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>激活后如何授权应用</h3></div>
+            <ol class="guide-list">
+              <li>在手机打开 Shizuku 应用，确认首页状态显示 <b>已启动</b>。</li>
+              <li>进入「设置 / 授权管理」，找到需要使用 Shizuku 的应用。</li>
+              <li>打开该应用右侧的开关，允许其使用 Shizuku。</li>
+              <li>回到目标应用重启，即可使用原本需要 ADB 权限的功能。</li>
+            </ol>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============ 日志面板 ============ -->
+      <section class="logpanel" id="logPanel">
+        <div class="log-head">
+          <div class="log-title">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+            运行日志
+            <span class="log-count" id="logCount">0</span>
+          </div>
+          <div class="log-tools">
+            <input type="search" id="logSearch" placeholder="搜索日志…" />
+            <select id="logLevelFilter" title="级别过滤">
+              <option value="ALL">全部级别</option>
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARN">WARN</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+            <button class="icon-btn sm" id="btnExportLog" title="导出日志">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+            </button>
+            <button class="icon-btn sm" id="btnClearLog" title="清空显示">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+            </button>
+            <button class="icon-btn sm" id="btnToggleLog" title="折叠/展开">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="log-body" id="logBody"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============ 设置弹窗 ============ -->
+  <div class="modal" id="settingsModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <h3>设置</h3>
+        <button class="icon-btn" data-close>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="set-group">
+          <h4>ADB</h4>
+          <label class="field">
+            <span>adb 可执行文件路径</span>
+            <input type="text" id="setAdbPath" placeholder="留空则自动探测，例如 D:\\platform-tools\\adb.exe" />
+          </label>
+          <label class="field">
+            <span>platform-tools 下载源</span>
+            <input type="text" id="setMirror" placeholder="https://dl.google.com/android/repository/platform-tools-latest-windows.zip" />
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="setAutoDownload" />
+            <span>未找到 adb 时自动下载内置版本</span>
+          </label>
+        </div>
+
+        <div class="set-group">
+          <h4>激活</h4>
+          <label class="field">
+            <span>启动脚本路径（每行一个，按顺序尝试）</span>
+            <textarea id="setStartPaths" rows="4" spellcheck="false"></textarea>
+          </label>
+          <label class="field">
+            <span>状态轮询间隔（毫秒）</span>
+            <input type="number" id="setInterval" min="1500" step="500" />
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="setAutoCheck" />
+            <span>激活成功后自动开始状态监控</span>
+          </label>
+        </div>
+
+        <div class="set-group">
+          <h4>日志与外观</h4>
+          <label class="field">
+            <span>日志级别</span>
+            <select id="setLogLevel">
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARN">WARN</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>主题</span>
+            <select id="setTheme">
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+              <option value="system">跟随系统</option>
+            </select>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="setAutoLaunch" />
+            <span>开机自动启动（静默运行到托盘）</span>
+          </label>
+        </div>
+
+        <div class="set-group">
+          <h4>维护</h4>
+          <div class="row-actions">
+            <button class="btn btn-sm" id="btnOpenConfigFolder">打开配置目录</button>
+            <button class="btn btn-sm" id="btnOpenLogFolder2">打开日志目录</button>
+            <button class="btn btn-sm btn-danger" id="btnResetConfig">恢复默认配置</button>
+          </div>
+          <p class="subtle" id="appInfo"></p>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" data-close>关闭</button>
+        <button class="btn btn-primary" id="btnSaveSettings">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Toast ============ -->
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
