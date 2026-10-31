@@ -1,0 +1,16 @@
+name: 功能建议
+description: 提出一个新想法或改进
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你的想法
+      description: 希望增加或改进什么？
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 为什么需要
+      description: 这个能力解决什么问题？
