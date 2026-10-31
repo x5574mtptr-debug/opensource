@@ -2,3 +2,11 @@
 node_modules/
 dist/
 *.zip
+
+# Vela 快应用构建产物
+build/
+*.rpk
+
+# 编辑器 / 系统
+.DS_Store
+*.log
