@@ -7,8 +7,10 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const state = {
   step: 'env',
+  zone: 'shizuku',
   devices: [],
   selected: null,
+  fbSerial: null,
   adb: null,
   status: null,
   logs: [],
@@ -52,12 +54,47 @@ function escapeHtml(s) {
   }[c]));
 }
 
-/* ================= 步骤切换 ================= */
+/* ================= 专区切换 ================= */
+const ZONE_META = {
+  shizuku: { title: 'Shizuku 激活专区', desc: '把手机上的 Shizuku 服务拉起来，让其他应用获得 ADB 级权限' },
+  fastboot: { title: 'Fastboot 专区', desc: '底层刷机模式：刷入镜像、解锁 Bootloader、清理数据、重启' }
+};
+
+function gotoZone(zone) {
+  if (!ZONE_META[zone]) return;
+  state.zone = zone;
+  $$('.zone-item').forEach((b) => b.classList.toggle('is-active', b.dataset.zone === zone));
+  $$('.zone-pane').forEach((p) => p.classList.toggle('is-active', p.dataset.zonePane === zone));
+
+  // 每个区里只显示属于自己的 view：
+  // Shizuku 区的四个子步骤视图由 gotoStep 控制，Fastboot 区只有一个视图
+  if (zone === 'fastboot') {
+    $$('.view').forEach((v) => {
+      v.classList.toggle('is-active', v.dataset.view === 'fastboot');
+    });
+  } else {
+    $$('.view').forEach((v) => {
+      if (v.dataset.view === 'fastboot') return;
+      v.classList.toggle('is-active', v.dataset.view === state.step);
+    });
+  }
+
+  $('#viewTitle').textContent = ZONE_META[zone].title;
+  $('#viewDesc').textContent = ZONE_META[zone].desc;
+  $('#content').scrollTop = 0;
+  if (zone === 'fastboot') refreshFastbootDevices();
+  else if (state.step === 'device') refreshDevices();
+}
+/* ================= 步骤切换（Shizuku 专区内部） ================= */
 function gotoStep(step) {
   if (!STEP_META[step]) return;
   state.step = step;
-  $$('.step-item').forEach((b) => b.classList.toggle('is-active', b.dataset.step === step));
-  $$('.view').forEach((v) => v.classList.toggle('is-active', v.dataset.view === step));
+  $$('.seg-item').forEach((b) => b.classList.toggle('is-active', b.dataset.step === step));
+  // Shizuku 区的四个子步骤视图；fastboot 视图独立，不受此处影响
+  $$('.view').forEach((v) => {
+    if (v.dataset.view === 'fastboot') return;
+    v.classList.toggle('is-active', v.dataset.view === step);
+  });
   $('#viewTitle').textContent = STEP_META[step].title;
   $('#viewDesc').textContent = STEP_META[step].desc;
   $('#content').scrollTop = 0;
@@ -70,9 +107,20 @@ function setBadge(step, cls) {
   if (el) el.className = 'step-badge' + (cls ? ' ' + cls : '');
 }
 
+/** 步骤完成时，同时更新分段控件与左侧大区徽章 */
 function markDone(step, done) {
-  const item = $(`.step-item[data-step="${step}"]`);
-  if (item) item.classList.toggle('is-done', !!done);
+  const seg = $(`.seg-item[data-step="${step}"]`);
+  if (seg) seg.classList.toggle('is-done', !!done);
+  // Shizuku 专区徽章：四步全部完成才算 ok
+  const allSteps = ['env', 'device', 'activate', 'verify'];
+  const allDone = allSteps.every((s) => {
+    const el = $(`.seg-item[data-step="${s}"]`);
+    return el && el.classList.contains('is-done');
+  });
+  const zb = $('#badge-shizuku');
+  if (zb) {
+    zb.className = 'zone-badge' + (allDone ? ' ok' : '');
+  }
 }
 
 /* ================= 状态指示 ================= */
@@ -427,6 +475,207 @@ async function runDiagnose() {
   toast(s.level === 'ok' ? 'ok' : s.level === 'err' ? 'err' : 'warn', s.title, s.advice, 6000);
 }
 
+/* ================= Fastboot 专区 ================= */
+async function refreshFastbootDevices() {
+  const list = $('#fbDeviceList');
+  if (!list) return;
+  list.innerHTML = '<div class="empty-state"><p>正在检测 fastboot 设备…</p></div>';
+
+  const res = await window.api.fastbootDevices();
+  const fbBadge = $('#badge-fastboot');
+
+  if (!res.ok) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
+        <p>fastboot 工具不可用</p>
+        <small>${escapeHtml(res.error || '未知错误')}</small>
+      </div>`;
+    $('#fbCount').textContent = '不可用';
+    $('#fbCount').className = 'tag err';
+    if (fbBadge) fbBadge.className = 'zone-badge err';
+    return;
+  }
+
+  const devices = res.devices || [];
+  $('#fbCount').textContent = `${devices.length} 台`;
+  $('#fbCount').className = 'tag' + (devices.length ? ' brand' : '');
+  if (fbBadge) fbBadge.className = 'zone-badge' + (devices.length ? ' ok' : '');
+
+  if (!devices.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
+        <p>未检测到 fastboot 设备</p>
+        <small>让手机进入 fastboot 模式后点击刷新</small>
+      </div>`;
+    state.fbSerial = null;
+    updateFbTarget();
+    return;
+  }
+
+  list.innerHTML = '';
+  for (const d of devices) {
+    const el = document.createElement('div');
+    el.className = 'device-item' + (state.fbSerial === d.serial ? ' selected' : '') +
+      (d.state !== 'fastboot' ? ' invalid' : '');
+    const st = d.state === 'fastboot' ? 'ok' : d.state === 'unauthorized' ? 'warn' : 'err';
+    el.innerHTML = `
+      <div class="device-icon">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
+      </div>
+      <div class="device-info">
+        <b>${escapeHtml(d.product || d.serial)}</b>
+        <small>${escapeHtml(d.serial)}</small>
+      </div>
+      <div class="device-meta">
+        <span class="tag ${st}">${escapeHtml(d.stateText)}</span>
+      </div>`;
+    el.addEventListener('click', () => {
+      if (d.state !== 'fastboot') {
+        toast('warn', '设备不可用', '请确认手机已正常进入 fastboot 模式');
+        return;
+      }
+      state.fbSerial = d.serial;
+      $$('#fbDeviceList .device-item').forEach((x) => x.classList.remove('selected'));
+      el.classList.add('selected');
+      updateFbTarget();
+      loadFastbootInfo(d.serial);
+    });
+    list.appendChild(el);
+  }
+
+  // 自动选中第一台
+  if (!state.fbSerial && devices.length) {
+    state.fbSerial = devices[0].serial;
+    list.querySelector('.device-item').classList.add('selected');
+    updateFbTarget();
+    loadFastbootInfo(state.fbSerial);
+  } else {
+    updateFbTarget();
+  }
+}
+
+function updateFbTarget() {
+  const el = $('#fbTarget');
+  if (el) {
+    el.textContent = state.fbSerial || '未选择设备';
+    el.className = state.fbSerial ? 'subtle' : 'subtle';
+  }
+  const has = !!state.fbSerial;
+  $$('.op-btn').forEach((b) => { b.disabled = !has; });
+}
+
+async function loadFastbootInfo(serial) {
+  const box = $('#fbInfo');
+  if (!box || !serial) return;
+  box.hidden = true;
+  const res = await window.api.fastbootInfo(serial);
+  if (!res || !res.info || !Object.keys(res.info).length) {
+    box.hidden = false;
+    box.innerHTML = '<div class="fb-info-grid"><div class="fb-info-row"><b>设备信息</b><span>未能读取（可能需要解锁或授权）</span></div></div>';
+    return;
+  }
+  const keys = ['product', 'variant', 'version-bootloader', 'serialno', 'unlocked', 'secure', 'current-slot', 'slot-count'];
+  const rows = keys
+    .filter((k) => res.info[k] !== undefined)
+    .map((k) => `<div class="fb-info-row"><b>${escapeHtml(k)}</b><span>${escapeHtml(res.info[k])}</span></div>`)
+    .join('');
+  box.hidden = false;
+  box.innerHTML = `<div class="fb-info-grid">${rows || '<div class="fb-info-row"><b>设备信息</b><span>无</span></div>'}</div>`;
+}
+
+function fbConsole(text, cls) {
+  const box = $('#fbConsole');
+  if (!box) return;
+  if (text === '') return;
+  box.textContent += (box.textContent ? '\n' : '') + text;
+  box.scrollTop = box.scrollHeight;
+}
+
+/** 执行一个 fastboot 操作 */
+async function doFastboot(action, extra) {
+  if (!state.fbSerial) {
+    toast('warn', '请先选择 fastboot 设备');
+    return;
+  }
+  const needsFile = extra && extra.needsFile;
+  if (needsFile) {
+    const p = $('#fbFilePath').value.trim();
+    if (!p) {
+      toast('warn', '请先选择文件', '点击「浏览…」选择要刷入的镜像或 ZIP 包');
+      return;
+    }
+  }
+
+  // 高风险操作二次确认
+  const risk = await window.api.fastbootRisk(action);
+  if (risk) {
+    const ok = await confirmDialog(risk.label, risk.note, action);
+    if (!ok) return;
+  }
+
+  const result = $('#fbResult');
+  result.hidden = false;
+  result.className = 'result-box info';
+  result.innerHTML = '正在执行：<b>' + escapeHtml(action) + '</b> …';
+
+  fbConsole(`> fastboot -s ${state.fbSerial} ${action}${extra && extra.args ? ' ' + extra.args : ''}`);
+
+  const args = extra && extra.args ? [extra.args] : [];
+  const res = await window.api.fastbootPerform(state.fbSerial, action, args);
+
+  fbConsole(res.output || '(无输出)');
+
+  if (res.ok) {
+    result.className = 'result-box ok';
+    result.innerHTML = `<b>${escapeHtml(action)} 成功</b>${escapeHtml(res.message || '')}`;
+    toast('ok', '操作成功', action);
+  } else {
+    result.className = 'result-box err';
+    result.innerHTML = `<b>${escapeHtml(action)} 失败</b>${escapeHtml(res.message || '')}
+      ${res.output ? `<pre>${escapeHtml(res.output)}</pre>` : ''}`;
+    toast('err', '操作失败', res.message, 6000);
+  }
+
+  // 操作后刷新设备（可能已断开或重启）
+  setTimeout(refreshFastbootDevices, 1500);
+}
+
+/** 危险操作确认对话框 */
+function confirmDialog(title, note, action) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-panel" style="width:min(440px,calc(100vw - 48px))">
+        <div class="modal-head">
+          <h3>确认操作</h3>
+        </div>
+        <div class="modal-body">
+          <div class="result-box ${action === 'flashing unlock' || action === 'erase userdata' || action === '-w' ? 'err' : 'info'}">
+            <b>${escapeHtml(title)}</b>${escapeHtml(note)}
+            <pre>fastboot -s ${escapeHtml(state.fbSerial || '')} ${escapeHtml(action)}</pre>
+          </div>
+          <p class="subtle">此操作不可撤销，请确认你清楚后果。</p>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" data-act="cancel">取消</button>
+          <button class="btn btn-danger" data-act="ok">确认执行</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = (v) => {
+      wrap.remove();
+      resolve(v);
+    };
+    wrap.querySelector('[data-act="cancel"]').addEventListener('click', () => close(false));
+    wrap.querySelector('[data-act="ok"]').addEventListener('click', () => close(true));
+    wrap.querySelector('.modal-backdrop').addEventListener('click', () => close(false));
+  });
+}
+
 /* ================= 状态检测 ================= */
 async function checkStatus() {
   if (!state.selected) {
@@ -494,6 +743,7 @@ async function openSettings() {
   const c = await window.api.getConfig();
   state.config = c;
   $('#setAdbPath').value = c.adbPath || '';
+  $('#setFastbootPath').value = c.fastbootPath || '';
   $('#setMirror').value = c.platformToolsMirror || '';
   $('#setAutoDownload').checked = c.autoDownloadAdb !== false;
   $('#setStartPaths').value = (c.startScriptPaths || []).join('\n');
@@ -509,9 +759,10 @@ async function openSettings() {
 }
 
 async function saveSettings() {
-  const patch = {
-    adbPath: $('#setAdbPath').value.trim(),
-    platformToolsMirror: $('#setMirror').value.trim(),
+    const patch = {
+      adbPath: $('#setAdbPath').value.trim(),
+      fastbootPath: $('#setFastbootPath').value.trim(),
+      platformToolsMirror: $('#setMirror').value.trim(),
     autoDownloadAdb: $('#setAutoDownload').checked,
     startScriptPaths: $('#setStartPaths').value.split('\n').map((s) => s.trim()).filter(Boolean),
     checkIntervalMs: parseInt($('#setInterval').value, 10) || 3000,
@@ -540,19 +791,45 @@ function applyTheme(theme) {
 
 /* ================= 初始化 ================= */
 async function init() {
+  // ===== 事件绑定必须最先完成 =====
+  // 若绑定依赖 await，任何一个 IPC 失败都会让整个界面失去响应。
+  // 这里把绑定与数据加载彻底解耦：绑定同步执行，数据加载放在其后。
+  bindEvents();
+
   // 主题
-  const cfg = await window.api.getConfig();
-  state.config = cfg;
-  applyTheme(cfg.theme);
+  try {
+    const cfg = await window.api.getConfig();
+    state.config = cfg;
+    applyTheme(cfg.theme);
+  } catch (e) {
+    console.error('读取配置失败，使用默认主题', e);
+    applyTheme('light');
+  }
 
   // 日志历史
-  const history = await window.api.getLogHistory();
-  state.logs = history || [];
-  renderLogs(false);
-  $('#logCount').textContent = state.logs.length;
+  try {
+    const history = await window.api.getLogHistory();
+    state.logs = history || [];
+    renderLogs(false);
+    $('#logCount').textContent = state.logs.length;
+  } catch (e) {
+    console.error('读取日志历史失败', e);
+  }
 
-  // 事件绑定
-  $$('.step-item').forEach((b) => b.addEventListener('click', () => gotoStep(b.dataset.step)));
+  // 初始检测
+  try {
+    await locateAdb(true);
+    await refreshDevices();
+    setGlobalStatus('', '待激活');
+  } catch (e) {
+    console.error('初始检测失败', e);
+  }
+}
+
+/** 事件绑定（同步执行，不依赖任何异步调用） */
+function bindEvents() {
+  $$('.seg-item').forEach((b) => b.addEventListener('click', () => gotoStep(b.dataset.step)));
+  $$('.zone-item').forEach((b) => b.addEventListener('click', () => gotoZone(b.dataset.zone)));
 
   $('#btnLocateAdb').addEventListener('click', () => locateAdb());
   $('#btnDownloadAdb').addEventListener('click', downloadAdb);
@@ -581,8 +858,26 @@ async function init() {
     }
   });
 
-  $('#btnOpenSettings').addEventListener('click', openSettings);
-  $('#btnOpenLogFolder').addEventListener('click', () => window.api.openLogFolder());
+  // ---- Fastboot 专区 ----
+  $('#btnRefreshFb').addEventListener('click', refreshFastbootDevices);
+  $('#btnPickFile').addEventListener('click', async () => {
+    const p = await window.api.pickFile([
+      { name: '镜像 / ZIP', extensions: ['img', 'zip', 'bin', 'mbn', 'elf'] },
+      { name: '全部文件', extensions: ['*'] }
+    ]);
+    if (p) $('#fbFilePath').value = p;
+  });
+  $$('.op-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.fb;
+      const needsFile = btn.dataset.needsFile === '1';
+      const filePath = $('#fbFilePath').value.trim();
+      const extra = needsFile && filePath ? { args: filePath, needsFile: true } : { needsFile };
+      doFastboot(action, extra);
+    });
+  });
+
+  $('#btnOpenSettings').addEventListener('click', openSettings);  $('#btnOpenLogFolder').addEventListener('click', () => window.api.openLogFolder());
   $('#btnOpenConfigFolder').addEventListener('click', () => window.api.openConfigFolder());
   $('#btnOpenLogFolder2').addEventListener('click', () => window.api.openLogFolder());
   $('#btnSaveSettings').addEventListener('click', saveSettings);
@@ -657,11 +952,6 @@ async function init() {
   });
   window.api.onMenuRefresh(() => refreshDevices());
   window.api.onConfigChanged((c) => { state.config = c; });
-
-  // 初始检测
-  await locateAdb(true);
-  await refreshDevices();
-  setGlobalStatus('', '待激活');
 }
 
 document.addEventListener('DOMContentLoaded', init);
