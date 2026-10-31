@@ -90,32 +90,66 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    logger.error('页面加载失败', { code, desc, url });
+  });
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    logger.error('渲染进程崩溃', { reason: details.reason, exitCode: details.exitCode });
+  });
+  mainWindow.webContents.on('console-message', (_e, level, message) => {
+    // 仅在 DEBUG 级别记录渲染端输出，避免刷屏
+    if (level >= 2 && logger.getLevel() === 'DEBUG') {
+      logger.debug('渲染进程消息', { message });
+    }
+  });
   mainWindow.once('ready-to-show', () => {
     if (!startHidden) mainWindow.show();
     if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
   });
 
   // 开发辅助：截图后自动退出
+  // 注意：loadFile 可能早于监听器注册完成，因此两个事件都要兜底，
+  // 且用 once 保证只执行一次
   if (screenshotPath) {
-    mainWindow.webContents.once('did-finish-load', () => {
-      setTimeout(async () => {
-        try {
-          const img = await mainWindow.webContents.capturePage();
-          fs.writeFileSync(screenshotPath, img.toPNG());
-          logger.info('界面截图已保存', { path: screenshotPath });
-        } catch (e) {
-          logger.error('截图失败', { error: e.message });
-        }
-        app.quit();
-      }, 1800);
-    });
+    const doShot = async () => {
+      try {
+        const img = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(screenshotPath, img.toPNG());
+        logger.info('界面截图已保存', { path: screenshotPath });
+      } catch (e) {
+        logger.error('截图失败', { error: e.message });
+      }
+      app.quit();
+    };
+    let shotDone = false;
+    const shotOnce = async () => {
+      if (shotDone) return;
+      shotDone = true;
+      setTimeout(doShot, 1500);
+    };
+    mainWindow.webContents.once('did-finish-load', shotOnce);
+    mainWindow.once('ready-to-show', shotOnce);
   }
 
   // 开发辅助：四步界面巡检
   if (tourDir) {
-    mainWindow.webContents.once('did-finish-load', () => {
-      setTimeout(() => runUiTour(mainWindow, tourDir), 1600);
-    });
+    let tourDone = false;
+    const tourOnce = () => {
+      if (tourDone) return;
+      tourDone = true;
+      logger.info('巡检触发', { via: 'event' });
+      setTimeout(() => runUiTour(mainWindow, tourDir), 1200);
+    };
+    mainWindow.webContents.once('did-finish-load', tourOnce);
+    mainWindow.once('ready-to-show', tourOnce);
+
+    // 兜底：轮询等待加载完成
+    const poll = setInterval(() => {
+      if (tourDone) return clearInterval(poll);
+      if (mainWindow.webContents && !mainWindow.webContents.isLoading()) {
+        tourOnce();
+      }
+    }, 300);
   }
 
   // 外部链接用系统浏览器打开
@@ -280,6 +314,7 @@ function registerIpc() {
     }
     return r;
   });
+  ipcMain.handle('shizuku:diagnose', (_e, serial) => shizuku.diagnose(serial));
   ipcMain.handle('shizuku:status', (_e, serial) => shizuku.checkStatus(serial));
   ipcMain.handle('shizuku:launchApp', (_e, serial) => shizuku.launchShizukuApp(serial));
   ipcMain.handle('shizuku:androidVersion', (_e, serial) => shizuku.getAndroidVersion(serial));
@@ -373,7 +408,10 @@ app.whenReady().then(async () => {
   registerIpc();
   createWindow();
 
-  logger.info(`${APP_NAME} 已启动`, { version: app.getVersion(), electron: process.versions.electron });
+  logger.info(`${APP_NAME} 已启动`, {
+    version: app.getVersion(),
+    electron: process.versions.electron
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -389,6 +427,22 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   stopStatusPolling();
   if (logger) logger.close();
+});
+
+// 全局异常捕获：避免主进程静默崩溃导致界面无响应
+process.on('uncaughtException', (err) => {
+  if (logger) {
+    logger.error('主进程未捕获异常', { message: err.message, stack: err.stack });
+  } else {
+    console.error('[未捕获异常]', err);
+  }
+});
+process.on('unhandledRejection', (reason) => {
+  if (logger) {
+    logger.error('主进程未处理的 Promise 拒绝', {
+      reason: reason && reason.message ? reason.message : String(reason)
+    });
+  }
 });
 
 /**
