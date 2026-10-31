@@ -2,6 +2,3 @@
 node_modules/
 dist/
 *.zip
-
-# 大体积/内部文件夹
-伪装软件*/

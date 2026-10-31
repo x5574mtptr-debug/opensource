@@ -1,0 +1,151 @@
+<template>
+  <div class="clock-page" ontouchstart="onRootTouchStart" ontouchmove="onRootTouchMove" ontouchend="onRootTouchEnd">
+    <text class="time" onclick="onTimeClick" ontouchstart="onTimeTouchStart" ontouchend="onTimeTouchEnd">{{ displayText }}</text>
+    <div if="showExitHint" class="exit-hint">
+      <text class="exit-hint-text">即将退出伪装模式</text>
+    </div>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+
+export default {
+  private: {
+    displayText: "",
+    currentTimeOnly: "",
+    clickCount: 0,
+    showNumber: false,
+    showExitHint: false,
+    touchStartX: 0,
+    touchStartY: 0,
+    isSwiping: false,
+    longPressTimer: null,
+    resetTimer: null,
+  },
+
+  onInit() {
+    this.updateTime();
+    setInterval(() => {
+      this.updateTime();
+    }, 1000);
+  },
+
+  updateTime() {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    this.currentTimeOnly = `${hours}:${minutes}`;
+    this.displayText = this.currentTimeOnly;
+  },
+
+  // 根容器的触摸拦截 - 阻止系统右滑返回
+  onRootTouchStart(ev) {
+    this.touchStartX = ev.screenX || ev.clientX || 0;
+    this.touchStartY = ev.screenY || ev.clientY || 0;
+    this.isSwiping = true;
+  },
+
+  onRootTouchMove(ev) {
+    if (!this.isSwiping) return;
+    var currentX = ev.screenX || ev.clientX || 0;
+    var deltaX = currentX - this.touchStartX;
+    
+    // 检测右滑 - 如果正在右滑，把滑动的元素位置锁在原始位置
+    if (deltaX > 20) {
+      // 阻止事件冒泡/默认行为来阻止右滑返回
+      ev.stopPropagation ? ev.stopPropagation() : void(0);
+      ev.preventDefault ? ev.preventDefault() : void(0);
+    }
+  },
+
+  onRootTouchEnd() {
+    this.isSwiping = false;
+  },
+
+  onBackPress() {
+    // 在伪装模式下，按返回键只能通过应用内方式退出
+    // 不从detail退出 - 这里不做任何事，返回true阻止默认行为
+    return true;
+  },
+
+  onTimeClick() {
+    this.clickCount++;
+    if (this.clickCount >= 4) {
+      this.clickCount = 0;
+      this.showNumber = true;
+      // 3 秒内没有长按则重置
+      var self = this;
+      if (this.resetTimer) clearTimeout(this.resetTimer);
+      this.resetTimer = setTimeout(function() {
+        self.showNumber = false;
+        self.resetTimer = null;
+      }, 3000);
+    }
+  },
+
+  onTimeTouchStart() {
+    if (!this.showNumber) return;
+    var self = this;
+    this.longPressTimer = setTimeout(function() {
+      // 长按触发：显示提示1秒后退出
+      self.showExitHint = true;
+      self.showNumber = false;
+      setTimeout(function() {
+        self.showExitHint = false;
+        router.back();
+      }, 1000);
+    }, 1000);
+  },
+
+  onTimeTouchEnd() {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    // 长按成功触发后，清除 3 秒重置计时器
+    if (this.resetTimer) {
+      clearTimeout(this.resetTimer);
+      this.resetTimer = null;
+    }
+  }
+}
+</script>
+
+<style>
+.clock-page {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background-color: #000000;
+  padding: 0 16px;
+}
+
+.time {
+  font-size: 56px;
+  text-align: center;
+  color: #777777;
+  font-weight: bold;
+  letter-spacing: 4px;
+}
+
+.exit-hint {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.6);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.exit-hint-text {
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: bold;
+}
+</style>
