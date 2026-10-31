@@ -1,0 +1,56 @@
+name: Build & Preview
+
+# 每次推送到 main 或开 PR 时，校验各 Vela 工程并构建产物，
+# 把 dist/ 与 build/ 作为可下载的「预览包」上传到 Actions Artifacts。
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Validate manifests are valid JSON
+        run: |
+          echo "校验所有 manifest.json 是否为合法 JSON…"
+          fail=0
+          for f in $(find . -name manifest.json -not -path '*/node_modules/*'); do
+            if ! node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))"; then
+              echo "❌ 非法 JSON: $f"
+              fail=1
+            else
+              echo "✅ $f"
+            fi
+          done
+          exit $fail
+
+      - name: Build each Vela project (best-effort)
+        run: |
+          for dir in "米环测试demo" "伪装软件v1" "67 语音助手"; do
+            if [ -f "$dir/package.json" ]; then
+              echo "=== 构建 $dir ==="
+              ( cd "$dir" && npm install --no-audit --no-fund )
+              # 优先用 npm scripts；缺失时退回 aiot CLI
+              ( cd "$dir" && (npm run build >/dev/null 2>&1 || npx --yes aiot-toolkit build >/dev/null 2>&1 || true) )
+            fi
+          done
+
+      - name: Upload preview artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vela-preview
+          path: |
+            */dist/**
+            */build/**
+          if-no-files-found: ignore
