@@ -36,3 +36,17 @@
 - **以前的 Shizuku 激活工具（搞机工具箱 1.0.0 便携版）** → [Release: old-shizuku-gaoji-1.0.0](https://github.com/x5574mtptr-debug/opensource/releases/tag/old-shizuku-gaoji-1.0.0)
   - 即上文「旧版」所指的那一份；主程序 `搞机工具箱.exe`，解压即用。
   - 仅作历史留存，新用户请用 1.0.0 便携版（v1.0.0-portable）。
+### 旧版 vs 1.0.0 便携版（打包实测差异）
+> 以下差异基于两个 zip 包的实际内容比对。旧版即「搞机工具箱 1.0.0 便携版」压缩包，1.0.0 便携版即 `Shizuku 激活工具 1.0.0 便携版`。
+
+| 项目 | 旧版（搞机工具箱 1.0.0） | 1.0.0 便携版（Shizuku 激活工具） |
+| --- | --- | --- |
+| 主程序 | `搞机工具箱.exe` | `Shizuku 激活工具.exe` |
+| 名称 / 品牌 | 搞机工具箱 | Shizuku 激活工具 |
+| 内置 ADB | 压缩包内**不含** `platform-tools/adb.exe`，需自备 ADB 环境 | 内置 `platform-tools`，无 adb 也能一键拉取 |
+| 便捷启动器 | 无 `启动 Shizuku.bat` | 附带 `启动 Shizuku.bat` |
+| app_process 直启 | 旧版实现 | 支持（自动避开分区存储限制） |
+| Fastboot 线刷 | 未包含（1.0.0 新增） | 支持解锁 / 刷 boot·recovery·OTA，高风险带二次确认 |
+| 无线调试 | 旧版未含 | 支持（Android 11+ 配对 + 连接） |
+| 设备诊断 / 分级日志 | 旧版未含 | 新增逐项检测与一键导出 |
+
