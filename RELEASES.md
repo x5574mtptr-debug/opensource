@@ -23,7 +23,7 @@
 | 设备诊断 | 无 | 逐项检测并给处置建议 |
 | 日志 | 视旧版而定 | 分级落盘 + 一键导出 |
 
-如果你手上有旧版文件，发我一份，我可以补一份逐条精确对照。
+旧版（搞机工具箱 1.0.0 便携版）已作为历史版本发布：[以前的 Shizuku 激活工具（旧版）](https://github.com/x5574mtptr-debug/opensource/releases/tag/old-shizuku-gaoji-1.0.0)。
 
 ## 三、使用前提（不变）
 - 手机先装好 Shizuku 应用并打开一次
@@ -31,3 +31,8 @@
 - 部分国产 ROM 需把 Shizuku 加入电池优化白名单
 
 > 最新便携版下载见仓库 **Releases**（基于 shizuku 分支发布）。
+
+## 四、历史版本（旧版）下载
+- **以前的 Shizuku 激活工具（搞机工具箱 1.0.0 便携版）** → [Release: old-shizuku-gaoji-1.0.0](https://github.com/x5574mtptr-debug/opensource/releases/tag/old-shizuku-gaoji-1.0.0)
+  - 即上文「旧版」所指的那一份；主程序 `搞机工具箱.exe`，解压即用。
+  - 仅作历史留存，新用户请用 1.0.0 便携版（v1.0.0-portable）。
